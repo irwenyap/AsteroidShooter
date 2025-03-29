@@ -9,25 +9,94 @@ enum class EventType {
     SpawnPlayer,
     ConnectedPlayer,
     FireBullet,
+	ReqFireBullet,
+	AckFireBullet,
     SpawnAsteroid,
     PlayerUpdate
 };
 
 struct GameEvent {
+	//uint32_t eventID;
     EventType type;
     virtual ~GameEvent() = default;
+
+};
+
+
+
+struct ReqFireBulletEvent : public GameEvent {
+    glm::vec3 position;
+    float rotation;
+    uint32_t ownerID;
+    uint32_t networkID;
+
+	ReqFireBulletEvent(const glm::vec3& pos, float rot, uint32_t ownID, uint32_t netID)
+		: position(pos), rotation(rot), ownerID(ownID), networkID(netID)
+    {
+        type = EventType::ReqFireBullet;
+    }
+
+	ReqFireBulletEvent(const std::vector<char>& packet) 
+    {
+        int16_t posX, posY;
+		float rot;
+		uint32_t ownID, netID;
+		std::memcpy(&posX, &packet[7], sizeof(posX));
+		std::memcpy(&posY, &packet[9], sizeof(posY));
+		std::memcpy(&rot, &packet[11], sizeof(rot));
+		std::memcpy(&ownID, &packet[13], sizeof(ownID));
+		std::memcpy(&netID, &packet[17], sizeof(netID));
+
+		position = { static_cast<int16_t>(ntohs(posX)) / 100.f, static_cast<int16_t>(ntohs(posY)) / 100.f, 0.f };
+		rotation = static_cast<int16_t>(ntohs(rot)) / 10.f;
+		ownerID = ntohl(ownID);
+		networkID = ntohl(netID);
+		type = EventType::ReqFireBullet;
+	}
+};
+
+struct AckFireBulletEvent : public GameEvent {
+	glm::vec3 position;
+	float rotation;
+	uint32_t ownerID;
+	uint32_t networkID;
+
+	AckFireBulletEvent(const glm::vec3& pos, float rot, uint32_t ownID, uint32_t netID)
+		: position(pos), rotation(rot), ownerID(ownID), networkID(netID)
+	{
+		type = EventType::AckFireBullet;
+	}
+
+    AckFireBulletEvent(const std::vector<char>& packet)
+    {
+        int16_t posX, posY;
+        float rot;
+        uint32_t ownID, netID;
+        std::memcpy(&posX, &packet[7], sizeof(posX));
+        std::memcpy(&posY, &packet[9], sizeof(posY));
+        std::memcpy(&rot, &packet[11], sizeof(rot));
+        std::memcpy(&ownID, &packet[13], sizeof(ownID));
+        std::memcpy(&netID, &packet[17], sizeof(netID));
+
+        position = { static_cast<int16_t>(ntohs(posX)) / 100.f, static_cast<int16_t>(ntohs(posY)) / 100.f, 0.f };
+        rotation = static_cast<int16_t>(ntohs(rot)) / 10.f;
+        ownerID = ntohl(ownID);
+        networkID = ntohl(netID);
+        type = EventType::ReqFireBullet;
+    }
 };
 
 struct FireBulletEvent : public GameEvent {
     glm::vec3 position;
     float rotation;
-    uint32_t ownerId;
+    uint32_t ownerID;
+    uint32_t networkID;
 
-    FireBulletEvent(const glm::vec3& pos, float rot, uint32_t owner)
-        : position(pos), rotation(rot), ownerId(owner)
-    {
-        type = EventType::FireBullet;
-    }
+	FireBulletEvent(const glm::vec3& pos, float rot, uint32_t ownID, uint32_t netID)
+		: position(pos), rotation(rot), ownerID(ownID), networkID(netID)
+	{
+		type = EventType::FireBullet;
+	}
 };
 
 struct StartGameEvent : public GameEvent {

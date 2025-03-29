@@ -42,6 +42,8 @@ public:
 	//void SendPacket(std::vector<char>);
 	size_t GetNumConnectedClients() const;
 
+	void SendToHost(const std::vector<char>& data);
+
 	inline std::string GetIPAddress() { return socketManager.GetLocalIP(); }
 	inline NetworkID GenerateID() { return nextID++; }
 

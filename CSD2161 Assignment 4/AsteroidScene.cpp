@@ -109,15 +109,62 @@ void AsteroidScene::ProcessEvents() {
 	for (auto& event : EventQueue::GetInstance().Drain()) {
 		switch (event->type) {
 		case EventType::FireBullet: {
-			auto* fire = static_cast<FireBulletEvent*>(event.get());
-			glm::vec3 dir(cos(fire->rotation), sin(fire->rotation), 0.f);
-			auto bullet = std::make_unique<PlayerBullet>(fire->position, dir);
-			//bullet->id = NextID();
-			gameObjects.push_back(std::move(bullet));
+			
 
-			// network engine need to broadcast all these events
 			break;
 		}
+		case EventType::ReqFireBullet: {
+			// only process this event if we are a client
+			if (NetworkEngine::GetInstance().isClient) {
+				auto* reqFire = static_cast<ReqFireBulletEvent*>(event.get());
+
+				std::vector<char> packet;
+				packet.push_back(NetworkEngine::CMDID::GAME_EVENT);
+				packet.push_back(static_cast<char>(1));
+				packet.push_back(static_cast<char>(EventType::ReqFireBullet));
+
+				NetworkID netNID = htonl(reqFire->networkID);
+				packet.insert(packet.end(), reinterpret_cast<char*>(&netNID),
+					reinterpret_cast<char*>(&netNID) + sizeof(netNID));
+
+				int16_t posX = static_cast<int16_t>(reqFire->position.x * 100);
+				int16_t posY = static_cast<int16_t>(reqFire->position.y * 100);
+				posX = htons(posX);
+				posY = htons(posY);
+				packet.insert(packet.end(), reinterpret_cast<char*>(&posX),
+					reinterpret_cast<char*>(&posX) + sizeof(posX));
+				packet.insert(packet.end(), reinterpret_cast<char*>(&posY),
+					reinterpret_cast<char*>(&posY) + sizeof(posY));
+
+				int16_t rot = static_cast<int16_t>(reqFire->rotation * 10);
+				rot = htons(rot);
+				packet.insert(packet.end(), reinterpret_cast<char*>(&rot),
+					reinterpret_cast<char*>(&rot) + sizeof(rot));
+
+				uint32_t ownerID = htonl(reqFire->ownerID);
+				packet.insert(packet.end(), reinterpret_cast<char*>(&ownerID),
+					reinterpret_cast<char*>(&ownerID) + sizeof(ownerID));
+
+				uint32_t netID = htonl(reqFire->networkID);
+				packet.insert(packet.end(), reinterpret_cast<char*>(&netID),
+					reinterpret_cast<char*>(&netID) + sizeof(netID));
+
+				NetworkEngine::GetInstance().SendToHost(packet);
+			}
+			else if (NetworkEngine::GetInstance().isHosting) {
+				
+			}
+
+			break;
+		}
+
+
+		case EventType::AckFireBullet: {
+			
+
+			break;
+		}
+
 		case EventType::StartGame: {
 			std::vector<char> packet;
 			packet.push_back(NetworkEngine::CMDID::GAME_EVENT);

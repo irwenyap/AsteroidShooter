@@ -46,7 +46,12 @@ void Player::Update(double dt)
         position += velocity * static_cast<float>(dt);
 
         if (input.GetKeyDown(GLFW_KEY_SPACE)) {
-            EventQueue::GetInstance().Push(std::make_unique<FireBulletEvent>(position, rotation, id));
+			if (NetworkEngine::GetInstance().isHosting) {
+				EventQueue::GetInstance().Push(std::make_unique<FireBulletEvent>(position, rotation, 0));
+            }
+            else {
+				EventQueue::GetInstance().Push(std::make_unique<ReqFireBulletEvent>(position, rotation, id, networkID));
+            }
         }
 
         if (glm::length(position - prevPos) > 1.f) {

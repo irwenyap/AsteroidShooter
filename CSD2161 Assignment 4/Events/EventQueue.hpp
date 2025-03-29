@@ -15,4 +15,5 @@ public:
 
 private:
     std::vector<std::unique_ptr<GameEvent>> events;
+	std::vector<std::unique_ptr<GameEvent>> waitingEvents;
 };

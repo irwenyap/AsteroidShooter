@@ -137,6 +137,10 @@ void NetworkEngine::Update(double) {
 					case static_cast<uint8_t>(EventType::SpawnAsteroid):
 						EventQueue::GetInstance().Push(std::make_unique<SpawnAsteroidEvent>(networkID, data));
 						break;
+					case static_cast<uint8_t>(EventType::ReqFireBullet):
+						EventQueue::GetInstance().Push(std::make_unique<ReqFireBulletEvent>(data));
+						break;
+
 					}
 				}
 				break;
@@ -448,3 +452,8 @@ size_t NetworkEngine::GetNumConnectedClients() const
 //			sizeof(serverInfo.address));
 //	}
 //}
+
+void NetworkEngine::SendToHost(const std::vector<char>& data)
+{
+	socketManager.SendToHost(data);
+}
