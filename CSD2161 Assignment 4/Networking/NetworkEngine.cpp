@@ -1,9 +1,6 @@
 #include "NetworkEngine.hpp"
-
 #include <iostream>
-
 #include "ws2tcpip.h"		// getaddrinfo()
-
 #include "../Events/EventQueue.hpp"
 
 // Tell the Visual Studio linker to include the following library in linking.
@@ -20,12 +17,51 @@
 extern Tick simulationTick;
 extern Tick localTick;
 
+
+// Define mapping from EventType to ChannelId
+ChannelId NetworkEngine::GetChannelForEventType(EventType type) {
+	switch (type) {
+	case EventType::RequestStartGame:
+	case EventType::StartGame:
+	case EventType::PlayerJoined:
+	case EventType::PlayerLeft:
+	case EventType::SpawnPlayer:
+	case EventType::SpawnAsteroid:
+	case EventType::FireBullet: 
+		return ChannelId::RELIABLE_ORDERED;
+	case EventType::PlayerUpdate:
+		// Client -> Host often uses unreliable, Host -> Clients might too
+		return ChannelId::UNRELIABLE_ORDERED;
+	default:
+		return ChannelId::RELIABLE_ORDERED; // Default reliable
+	}
+}
+
+// Helper to hash sockaddr_in for map key
+struct SockAddrInHasher {
+	std::size_t operator()(const sockaddr_in& addr) const {
+		size_t h1 = std::hash<uint32_t>{}(addr.sin_addr.s_addr);
+		size_t h2 = std::hash<uint16_t>{}(addr.sin_port);
+		return h1 ^ (h2 << 1);
+	}
+};
+struct SockAddrInEqual {
+	bool operator()(const sockaddr_in& lhs, const sockaddr_in& rhs) const {
+		return lhs.sin_addr.s_addr == rhs.sin_addr.s_addr && lhs.sin_port == rhs.sin_port;
+	}
+};
+
+
+
 NetworkEngine& NetworkEngine::GetInstance() {
 	static NetworkEngine ne;
 	return ne;
 }
 
 void NetworkEngine::Initialize() {
+
+	if (isInitialized) return;
+
 	WSADATA wsaData{};
 	SecureZeroMemory(&wsaData, sizeof(wsaData));
 
@@ -34,208 +70,244 @@ void NetworkEngine::Initialize() {
 		std::cerr << "WSAStartup() failed.\n";
 		return;
 	}
+
+	// Initialize Channel Configurations
+	channelConfigs[ChannelId::RELIABLE_ORDERED] = { true, true};
+	channelConfigs[ChannelId::UNRELIABLE_ORDERED] = { false, true};
+	channelConfigs[ChannelId::ACKNACK_RELIABLE] = { true, false}; // Reliable, Unordered
+	channelConfigs[ChannelId::COMMIT_TICK_RELIABLE] = { true, false}; // Reliable, Unordered
+
+	isInitialized = true;
+	std::cout << "Network Engine Initialized.\n";
 }
 
-void NetworkEngine::Update(double) {
-	std::vector<char> data;
-	sockaddr_in sender{};
+bool NetworkEngine::Host(std::string port) {
+	if (!isInitialized || isHosting || isClient) return false;
+	if (!socketManager.Host(port)) {
+		std::cerr << "NetworkEngine::Host failed to setup socket.\n";
+		return false;
+	}
+	isHosting = true;
+	myNetworkId = 0; // Host is often ID 0 or a special value
+	currentNetworkTick = 0;
+	lastCommittedTick = 0;
+	portNumber = port;
+	std::cout << "Hosting on IP: " << GetIPAddress() << " Port: " << port << std::endl;
+	return true;
+}
 
-	if (isHosting && socketManager.ReceiveFromClient(data, sender)) {
-		switch (data[0]) {
-		case REQ_CONNECTION:
-			HandleIncomingConnection(data, sender);
-			break;
-		case GAME_DATA:
-			EventQueue::GetInstance().Push(std::make_unique<PlayerUpdate>(data.data(), data.size()));
-			SendToOtherClients(sender, data);
-			break;
-		case GAME_EVENT:
-			break;
-		default:
-			break;
-		}
-	} else if (isClient) {
-		//switch (data[0]) {
-		//case TICK_SYNC: {
-		//	Tick receivedTick;
-		//	std::memcpy(&receivedTick, &data[1], sizeof(receivedTick));
-		//	localTick = ntohl(receivedTick);
-		//	break;
-		//}
-		//case GAME_DATA: {
-		//	// handle later
-		//	EventQueue::GetInstance().Push(std::make_unique<PlayerUpdate>(data.data(), data.size()));
-		//	break;
-		//}
-		//case GAME_EVENT: {
-		//	// process all events
-		//	int offset = 2;
-		//	for (uint8_t i = 0; i < data[1]; ++i) {
-		//		//if (data[offset] == static_cast<char>(EventType::SpawnPlayer)) {
-		//		//	NetworkID networkID;
-		//		//	std::memcpy(&networkID, &data[offset], sizeof(networkID));
-		//		//	networkID = ntohl(networkID);
-		//		//	EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
-		//		//	offset += 5;
-		//		//} else if (data[offset] == static_cast<char>(EventType::ConnectedPlayer)) {
-		//		//	NetworkID networkID;
-		//		//	std::memcpy(&networkID, &data[offset], sizeof(networkID));
-		//		//	networkID = ntohl(networkID);
-		//		//	EventQueue::GetInstance().Push(std::make_unique<ConnectedPlayerEvent>(networkID));
-		//		//	offset += 5;
-		//		//}
-		//		uint8_t eventType = data[offset];
-		//		offset += 1;
 
-		//		NetworkID networkID;
-		//		std::memcpy(&networkID, &data[offset], sizeof(networkID));
-		//		networkID = ntohl(networkID);
-		//		offset += sizeof(networkID);
+bool NetworkEngine::Connect(std::string hostIp, std::string port) {
+	if (!isInitialized || isHosting || isClient || isConnecting) return false;
 
-		//		switch (eventType) {
-		//		case static_cast<uint8_t>(EventType::SpawnPlayer):
-		//			EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
-		//			break;
-		//		case static_cast<uint8_t>(EventType::ConnectedPlayer):
-		//			EventQueue::GetInstance().Push(std::make_unique<ConnectedPlayerEvent>(networkID));
-		//			break;
-		//		case static_cast<uint8_t>(EventType::SpawnAsteroid):
-		//			EventQueue::GetInstance().Push(std::make_unique<SpawnAsteroidEvent>(networkID, data));
-		//			break;
-		//		}
-		//	}
-		//}
-		//}
-		while (socketManager.ReceiveFromHost(data)) {
-			switch (data[0]) {
-			case TICK_SYNC: {
-				Tick receivedTick;
-				std::memcpy(&receivedTick, &data[1], sizeof(receivedTick));
-				localTick = ntohl(receivedTick);
-				break;
-			}
-			case GAME_DATA: {
-				EventQueue::GetInstance().Push(std::make_unique<PlayerUpdate>(data.data(), data.size()));
-				break;
-			}
-			case GAME_EVENT: {
-				int offset = 2;
-				for (uint8_t i = 0; i < data[1]; ++i) {
-					uint8_t eventType = data[offset++];
-					NetworkID networkID;
-					std::memcpy(&networkID, &data[offset], sizeof(networkID));
-					networkID = ntohl(networkID);
-					offset += sizeof(networkID);
-
-					switch (eventType) {
-					case static_cast<uint8_t>(EventType::SpawnPlayer):
-						EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
-						break;
-					case static_cast<uint8_t>(EventType::ConnectedPlayer):
-						EventQueue::GetInstance().Push(std::make_unique<ConnectedPlayerEvent>(networkID));
-						break;
-					case static_cast<uint8_t>(EventType::SpawnAsteroid):
-						EventQueue::GetInstance().Push(std::make_unique<SpawnAsteroidEvent>(networkID, data));
-						break;
-					}
-				}
-				break;
-			}
-			}
-		}
+	if (!socketManager.Connect(hostIp, port)) {
+		std::cerr << "NetworkEngine::Connect failed to create socket.\n";
+		return false;
 	}
 
-#pragma region old stuff
-	// Host
-	//if (udpListeningSocket != INVALID_SOCKET) {
-	//	char buffer[100] = { 0 };
-	//	sockaddr_in clientAddr;
-	//	int addrLen = sizeof(clientAddr);
-	//	int recvResult = recvfrom(
-	//		udpListeningSocket, 
-	//		buffer, 
-	//		sizeof(buffer), 
-	//		0, 
-	//		reinterpret_cast<sockaddr*>(&clientAddr), 
-	//		&addrLen);
-	//	if (recvResult > 0) {
-	//		if (buffer[0] == REQ_CONNECTION) {
-	//			std::vector<char> packet;
-	//			CMDID reply = RSP_CONNECTION;
-	//			packet.push_back(reply);
+	isConnecting = true;
+	isClient = true; // Assume client role now
+	hostAddress = socketManager.GetServerAddress(); // Get resolved address
 
-	//			int sendResult = sendto(
-	//				udpListeningSocket,
-	//				packet.data(),
-	//				packet.size(), 0,
-	//				reinterpret_cast<sockaddr*>(&clientAddr),
-	//				addrLen);
-	//			if (sendResult == SOCKET_ERROR) {
-	//				std::cerr << "sendto() for RSP_CONNECTION failed. Error: " << WSAGetLastError() << "\n";
-	//			}
-	//			char ipBuffer[INET_ADDRSTRLEN];
-	//			inet_ntop(
-	//				AF_INET, 
-	//				&(clientAddr.sin_addr), 
-	//				ipBuffer, 
-	//				INET_ADDRSTRLEN);
-	//			std::string clientIP(ipBuffer);
+	// Send REQ_CONNECTION reliably (using a basic retry for handshake)
+	const int maxRetries = 5;
+	int retryCount = 0;
+	bool ackReceived = false;
+	std::vector<char> reqPacket = { CMDID::REQ_CONNECTION }; // Simple request payload
+	timeval timeout = { 1, 0 }; // 1 second timeout
 
-	//			bool exists = false;
-	//			for (const auto& client : clientConnections) {
-	//				if (client.ipAddress == clientIP && ntohs(clientAddr.sin_port) == client.udpPort) {
-	//					exists = true;
-	//					break;
-	//				}
-	//			}
+	std::cout << "Attempting connection to " << hostIp << ":" << port << "...\n";
 
-	//			if (!exists) {
-	//				Client newClient;
-	//				newClient.address = clientAddr;
-	//				newClient.ipAddress = clientIP;
-	//				newClient.udpPort = ntohs(clientAddr.sin_port);
-	//				newClient.isConnected = true;
-	//				clientConnections.push_back(newClient);
-	//				std::cout << "Added new client: " << clientIP << ":" << newClient.udpPort << "\n";
-	//				EventQueue::GetInstance().Push(std::make_unique<ClientJoinedEvent>());
-	//			}
-	//		} else if (buffer[0] == GAME_DATA) {
-	//			std::cout << "GAME DATA RECEIVED\n";
-	//			//float test1 = static_cast<float>(static_cast<int8_t>(buffer[1]));
-	//			//float test2 = static_cast<float>(static_cast<int8_t>(buffer[2]));
-	//			//std::cout << test1 << " :BUFFER: " << test2 << std::endl;
-	//			EventQueue::GetInstance().Push(std::make_unique<PlayerUpdate>(buffer, recvResult));
-	//		}
-	//	}
-	//} else if (clientUDPSocket != INVALID_SOCKET) { // Client
-	//	char buffer[1472];
-	//	int addrLen = sizeof(serverInfo.address);
-	//	int recvResult = recvfrom(
-	//		clientUDPSocket,
-	//		buffer,
-	//		sizeof(buffer),
-	//		0,
-	//		reinterpret_cast<sockaddr*>(&serverInfo.address),
-	//		&addrLen);
+	while (!ackReceived && retryCount < maxRetries) {
+		socketManager.SendToHost(reqPacket); // Raw send for handshake
 
-	//	if (recvResult > 0) {
-	//		if (buffer[0] == TICK_SYNC) {
-	//			//std::cout << "TICK FROM SERVER RECEIVED\n";
-	//			Tick receivedTick;
-	//			std::memcpy(&receivedTick, buffer + 1, sizeof(receivedTick));
-	//			localTick = ntohl(receivedTick);
-	//		} else if (buffer[0] == GAME_DATA) {
+		fd_set readfds;
+		FD_ZERO(&readfds);
+		FD_SET(socketManager.GetClientSocket(), &readfds); // Use socket from manager
 
-	//		}
-	//	}
-	//}
-#pragma endregion
+		int selResult = select(0, &readfds, nullptr, nullptr, &timeout);
+
+		if (selResult > 0 && FD_ISSET(socketManager.GetClientSocket(), &readfds)) {
+			std::vector<char> recvBuffer(1500);
+			sockaddr_in senderAddr;
+			int addrLen = sizeof(senderAddr);
+			int bytesRead = recvfrom(socketManager.GetClientSocket(), recvBuffer.data(), recvBuffer.size(), 0, (SOCKADDR*)&senderAddr, &addrLen);
+
+			// Check if it's from the host we expect and is the RSP_CONNECTION
+			if (bytesRead > 0 && senderAddr.sin_addr.s_addr == hostAddress.sin_addr.s_addr && senderAddr.sin_port == hostAddress.sin_port)
+			{
+				if (bytesRead >= (sizeof(PacketHeader) + sizeof(NetworkID)) && recvBuffer[0] == static_cast<uint8_t>(ChannelId::RELIABLE_ORDERED)) {
+					// Proper response likely comes on reliable channel now
+					PacketHeader* header = reinterpret_cast<PacketHeader*>(recvBuffer.data());
+					char* payload = recvBuffer.data() + sizeof(PacketHeader);
+					size_t payloadSize = bytesRead - sizeof(PacketHeader);
+
+					if (payloadSize >= sizeof(NetworkID)) {
+						// Assuming payload[0] implicitly indicates RSP_CONNECTION
+						std::memcpy(&myNetworkId, payload, sizeof(NetworkID));
+						myNetworkId = ntohl(myNetworkId); // Get assigned ID
+						ackReceived = true;
+						std::cout << "Connection successful! Assigned NetworkID: " << myNetworkId << std::endl;
+					}
+				}
+				//else if (bytesRead == 1 && recvBuffer[0] == CMDID::RSP_CONNECTION) {
+				//	// Fallback for simple ACK if host hasn't switched to channels yet
+				//	ackReceived = true;
+				//	myNetworkId = 1; // Assign a default? Host should send ID.
+				//	std::cerr << "Warning: Received simple connection ACK. Host should send NetworkID.\n";
+				//}
+			}
+		}
+		else if (selResult == 0) {
+			std::cout << "Connection attempt timed out. Retrying (" << retryCount + 1 << "/" << maxRetries << ")...\n";
+		}
+		else {
+			std::cerr << "Select error during connection: " << WSAGetLastError() << std::endl;
+			break; // Socket error
+		}
+		retryCount++;
+	}
+
+	isConnecting = false;
+	if (ackReceived) {
+		isConnected = true;
+		socketManager.SetNonBlocking(socketManager.GetClientSocket());
+		return true;
+	}
+	else {
+		std::cerr << "Connection failed after " << maxRetries << " retries.\n";
+		socketManager.Cleanup(); // Close the socket
+		isClient = false;
+		return false;
+	}
 }
 
 
-bool NetworkEngine::Host(std::string portNumber) {
-	return socketManager.Host(portNumber);
+void NetworkEngine::Update(double dt) {
+	if (!isInitialized || (!isHosting && !isClient)) return;
+
+	ProcessIncomingPackets();
+
+	if (isHosting) {
+		UpdateCommitTick(dt);
+		CheckTimeouts(dt);
+		currentNetworkTick++; // Advance host tick
+	}
+	else if (isClient && isConnected) {
+		// Client-specific updates (e.g., sending input) happen elsewhere via SendToServer
+	}
 }
+
+void NetworkEngine::ProcessIncomingPackets() {
+	std::vector<char> recvBuffer(1500); // Max UDP payload size
+	sockaddr_in senderAddr;
+
+	SOCKET currentSocket = isHosting ? socketManager.GetHostSocket() : socketManager.GetClientSocket();
+	if (currentSocket == INVALID_SOCKET) return;
+
+	int bytesRead;
+	do {
+		bytesRead = socketManager.Receive(currentSocket, recvBuffer.data(), recvBuffer.size(), senderAddr);
+		if (bytesRead > 0) {
+			HandlePacket(recvBuffer.data(), bytesRead, senderAddr);
+		}
+		else if (bytesRead == SOCKET_ERROR) {
+			int error = WSAGetLastError();
+			if (error != WSAEWOULDBLOCK && error != WSAECONNRESET) { // Ignore WouldBlock, handle reset
+				std::cerr << "recvfrom error: " << error << std::endl;
+				// Potentially handle disconnect
+			}
+		}
+	} while (bytesRead > 0); // Keep processing until WSAEWOULDBLOCK
+}
+
+
+void NetworkEngine::HandlePacket(const char* buffer, int bytesRead, const sockaddr_in& senderAddr) {
+
+	if (isHosting) {
+
+		// --- Host Packet Handling ---
+		uint64_t addrHash = SockAddrInHasher{}(senderAddr);
+		auto mapIt = addrToClientIdMap.find(addrHash);
+
+		// Check for initial connection request (doesn't use channels/headers yet)
+		if (bytesRead == 1 && buffer[0] == CMDID::REQ_CONNECTION) {
+			std::cout << "Received REQ_CONNECTION from new potential client.\n";
+			NetworkID newClientId = nextNetworkId++;
+			ClientNetworkState newClientState;
+			newClientState.address = senderAddr;
+			newClientState.clientId = newClientId;
+			newClientState.isConnected = true; // Mark as connected after response
+			newClientState.lastHeardFrom = std::chrono::steady_clock::now();
+			connectedClients[newClientId] = newClientState;
+
+
+			// Send RSP_CONNECTION back with their assigned ID on a reliable channel
+			std::vector<char> payload;
+			NetworkID netId = htonl(newClientId);
+			payload.insert(payload.end(), reinterpret_cast<char*>(&netId), reinterpret_cast<char*>(&netId) + sizeof(netId));
+
+			// Use InternalSend to add header and handle potential retransmission
+			InternalSend(socketManager.GetHostSocket(), senderAddr, ChannelId::RELIABLE_ORDERED,
+				connectedClients[newClientId].nextSequenceToSend[ChannelId::RELIABLE_ORDERED]++, // Get & increment seq
+				payload, true);
+
+			std::cout << "Sent RSP_CONNECTION with ID " << newClientId << " to client.\n";
+			// TODO: Trigger PlayerJoined event for other clients? Or wait for game start?
+
+			return; // Handled connection request
+		}
+
+		if (mapIt == addrToClientIdMap.end()) {
+			std::cerr << "Received packet from unknown address (not REQ_CONNECTION). Ignoring.\n";
+			return; // Ignore packets from clients not in our map (unless it's REQ_CONN)
+		}
+
+		NetworkID clientId = mapIt->second;
+		ClientNetworkState& clientState = connectedClients[clientId];
+		clientState.lastHeardFrom = std::chrono::steady_clock::now();
+
+		// All further communication MUST have a header
+		if (bytesRead < sizeof(PacketHeader)) {
+			std::cerr << "Received packet too small for header from client " << clientId << ". Ignoring.\n";
+			return;
+		}
+
+		PacketHeader* header = (PacketHeader*)buffer;
+		ChannelId channel = static_cast<ChannelId>(header->channelId);
+		SequenceNumber sequence = ntohl(header->sequenceNumber); // Assuming client sends network byte order
+		const char* payload = buffer + sizeof(PacketHeader);
+		size_t payloadSize = bytesRead - sizeof(PacketHeader);
+
+		HandleClientPacket(clientState, channel, sequence, payload, payloadSize);
+
+	}
+	else if (isClient && isConnected) {
+		// --- Client Packet Handling ---
+		// Only accept packets from the known host address
+		if (senderAddr.sin_addr.s_addr != hostAddress.sin_addr.s_addr || senderAddr.sin_port != hostAddress.sin_port) {
+			std::cerr << "Received packet from unexpected address. Ignoring.\n";
+			return;
+		}
+
+		if (bytesRead < sizeof(PacketHeader)) {
+			std::cerr << "Received packet too small for header from host. Ignoring.\n";
+			return;
+		}
+
+		PacketHeader* header = (PacketHeader*)buffer;
+		ChannelId channel = static_cast<ChannelId>(header->channelId);
+		SequenceNumber sequence = ntohl(header->sequenceNumber); // Host sends network byte order
+		const char* payload = buffer + sizeof(PacketHeader);
+		size_t payloadSize = bytesRead - sizeof(PacketHeader);
+
+		HandleHostPacket(channel, sequence, payload, payloadSize);
+	}
+}
+
+
+
+
 static uint32_t myPlayerID; // temp
 bool NetworkEngine::Connect(std::string host, std::string portNumber) {
 #pragma region old stuff

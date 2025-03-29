@@ -184,6 +184,12 @@ bool SocketManager::ReceiveFromHost(std::vector<char>& outData)
     return false;
 }
 
+int SocketManager::Receive(SOCKET sock, char* buffer, int len, sockaddr_in& sender) {
+    if (sock == INVALID_SOCKET) return SOCKET_ERROR;
+    int addrLen = sizeof(sender);
+    return recvfrom(sock, buffer, len, 0, reinterpret_cast<sockaddr*>(&sender), &addrLen);
+}
+
 void SocketManager::SetNonBlocking(SOCKET sock)
 {
     u_long mode = 1;

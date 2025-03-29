@@ -24,10 +24,16 @@ public:
 
 	bool ReceiveFromClient(std::vector<char>& outData, sockaddr_in& outAddr);
 	bool ReceiveFromHost(std::vector<char>& outData);
+	int Receive(SOCKET sock, char* buffer, int len, sockaddr_in& sender);
 
 	inline std::string GetLocalIP() const {
 		return localIP;
 	}
+
+	const sockaddr_in& GetServerAddress() const { return serverInfo.address; }
+	SOCKET GetClientSocket() const { return clientSocket; }
+	SOCKET GetHostSocket() const { return udpListeningSocket; }
+	void SetNonBlocking(SOCKET sock);
 
 private:
 	SOCKET udpListeningSocket = INVALID_SOCKET;
@@ -35,7 +41,5 @@ private:
 
 	Server serverInfo;
 	std::string localIP;
-
-	void SetNonBlocking(SOCKET sock);
 };
 

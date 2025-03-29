@@ -4,13 +4,26 @@
 #include <glm/vec3.hpp>
 #include <WinSock2.h>
 
-enum class EventType {
-    StartGame,
-    SpawnPlayer,
-    ConnectedPlayer,
-    FireBullet,
-    SpawnAsteroid,
-    PlayerUpdate
+enum class EventType : uint8_t{
+	//Control
+	RequestStartGame, //Client ask host to start the game
+	StartGame, // Host starts the game (confirmation)
+
+	//State
+    PlayerJoined, //Info about player joining (broadcast by host) 
+	PlayerLeft, //Info about player leaving (broadcast by host)
+	SpawnPlayer, //Host spawns a player
+	SpawnAsteroid, //Host spawns an asteroid
+
+	//Actions
+	FireBullet, //Player fires a bullet
+	AsteroidHit, //Asteroid is hit by a bullet
+    
+	PlayerUpdate, //Player position update
+
+	//Rendering
+	RenderBullet, //Render bullet
+	RenderAsteroid, //Render asteroid
 };
 
 struct GameEvent {
@@ -46,14 +59,14 @@ struct SpawnPlayerEvent : public GameEvent {
     }
 };
 
-struct ConnectedPlayerEvent : public GameEvent {
+struct PlayerJoinedEvent : public GameEvent {
     uint32_t networkID;
     glm::vec3 initialPosition;
-    float initialRotation;
+    float initialRotation{};
 
-    ConnectedPlayerEvent(uint32_t id) : networkID(id)
+    PlayerJoinedEvent(uint32_t id) : networkID(id)
     {
-        type = EventType::ConnectedPlayer;
+        type = EventType::PlayerJoined;
     }
 };
 

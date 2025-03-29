@@ -139,7 +139,7 @@ void AsteroidScene::ProcessEvents() {
 				Player* rawPlayerPtr = localPlayer.get();
 				gameObjects.push_back(std::move(localPlayer));
 				networkedObjects[rawPlayerPtr->networkID] = rawPlayerPtr;
-				packet.push_back(static_cast<char>(EventType::ConnectedPlayer));
+				packet.push_back(static_cast<char>(EventType::PlayerJoined));
 				NetworkID netNID = htonl(rawPlayerPtr->networkID);
 				packet.insert(packet.end(), reinterpret_cast<char*>(&netNID),
 					reinterpret_cast<char*>(&netNID) + sizeof(netNID));
@@ -160,7 +160,7 @@ void AsteroidScene::ProcessEvents() {
 				Player* rawRemote = remotePlayer.get();
 				gameObjects.push_back(std::move(remotePlayer));
 				networkedObjects[rawRemote->networkID] = rawRemote;
-				packet.push_back(static_cast<char>(EventType::ConnectedPlayer));
+				packet.push_back(static_cast<char>(EventType::PlayerJoined));
 				NetworkID netNID = htonl(rawRemote->networkID);
 				packet.insert(packet.end(), reinterpret_cast<char*>(&netNID),
 					reinterpret_cast<char*>(&netNID) + sizeof(netNID));
@@ -196,8 +196,8 @@ void AsteroidScene::ProcessEvents() {
 			networkedObjects[rawPlayerPtr->networkID] = dynamic_cast<NetworkObject*>(rawPlayerPtr);
 			break;
 		}
-		case EventType::ConnectedPlayer: {
-			auto* joinEvent = static_cast<ConnectedPlayerEvent*>(event.get());
+		case EventType::PlayerJoined: {
+			auto* joinEvent = static_cast<PlayerJoinedEvent*>(event.get());
 			auto newPlayer = std::make_unique<Player>();
 			newPlayer->networkID = joinEvent->networkID;
 			newPlayer->position = glm::vec3(0, 0, 0);
