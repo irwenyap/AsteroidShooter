@@ -3,6 +3,9 @@
 #include <string>
 #include <glm/vec3.hpp>
 #include <WinSock2.h>
+#include "../Networking/NetworkObject.hpp"
+using NetworkID = uint32_t;
+
 
 enum class EventType {
     StartGame,
@@ -10,7 +13,8 @@ enum class EventType {
     ConnectedPlayer,
     FireBullet,
     SpawnAsteroid,
-    PlayerUpdate
+    PlayerUpdate,
+    Collision
 };
 
 struct GameEvent {
@@ -79,6 +83,15 @@ struct SpawnAsteroidEvent : public GameEvent {
 
         type = EventType::SpawnAsteroid;
     }
+};
+
+struct CollisionEvent : public GameEvent {
+    CollisionEvent(NetworkID a, NetworkID b)
+        : idA(a), idB(b) {
+        type = EventType::Collision;
+    }
+    NetworkID idA;
+    NetworkID idB;
 };
 
 struct PlayerUpdate : public GameEvent {

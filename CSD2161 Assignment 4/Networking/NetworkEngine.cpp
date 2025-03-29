@@ -137,6 +137,17 @@ void NetworkEngine::Update(double) {
 					case static_cast<uint8_t>(EventType::SpawnAsteroid):
 						EventQueue::GetInstance().Push(std::make_unique<SpawnAsteroidEvent>(networkID, data));
 						break;
+
+					case static_cast<uint8_t>(EventType::Collision): {
+						NetworkID idB;
+						std::memcpy(&idB, &data[offset], sizeof(NetworkID));
+						idB = ntohl(idB);
+						offset += sizeof(NetworkID);
+
+						EventQueue::GetInstance().Push(std::make_unique<CollisionEvent>(networkID, idB));
+						break;
+					}
+						
 					}
 				}
 				break;

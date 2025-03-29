@@ -9,6 +9,7 @@
 #include "Networking/NetworkEngine.hpp"
 #include <iostream>
 #include "Asteroid.hpp"
+#include <unordered_set>
 
 #define MAX_LOCAL_GAMEOBJECTS 1250
 const double asteroidSpawnRate = 5.0;
@@ -103,7 +104,47 @@ void AsteroidScene::FixedUpdate(double fixedDT) {
 	for (auto& go : gameObjects) {
 		go->Update(fixedDT);
 	}
+
+	// Setting only host to detect for collision
+	if (!NetworkEngine::GetInstance().isHosting)
+		return; 
+	
+	//Loop through all pairs of game objects to check for collisions
+	for (size_t i = 0; i < gameObjects.size(); ++i) {
+		for (size_t j = i + 1; j < gameObjects.size(); ++j) {
+
+			auto* a = dynamic_cast<NetworkObject*>(gameObjects[i].get());
+			auto* b = dynamic_cast<NetworkObject*>(gameObjects[j].get());
+			if (!a || !b) continue;
+
+			//Determining object if its bullet/asteroid
+			auto* bullet = dynamic_cast<PlayerBullet*>(a);
+			auto* asteroid = dynamic_cast<Asteroid*>(b);
+
+			//swap if undetected
+			if (!bullet || !asteroid) {
+				bullet = dynamic_cast<PlayerBullet*>(b);
+				asteroid = dynamic_cast<Asteroid*>(a);
+			}
+
+			//if not bullet-asteroid pair continue
+			if (!bullet || !asteroid) continue;
+
+			//distance between bullet and asteroid
+			float dist = glm::length(bullet->position - asteroid->position);
+
+			//CollisionDistance 
+			float collisionDist = (bullet->scale.x + asteroid->scale.x) * 0.5f;
+
+			//Push a collisionEvent into event queue of both objects
+			if (dist < collisionDist) {
+				EventQueue::GetInstance().Push(std::make_unique<CollisionEvent>(bullet->networkID, asteroid->networkID));
+			}
+		}
+	}
+
 }
+
 
 void AsteroidScene::ProcessEvents() {
 	for (auto& event : EventQueue::GetInstance().Drain()) {
@@ -112,8 +153,12 @@ void AsteroidScene::ProcessEvents() {
 			auto* fire = static_cast<FireBulletEvent*>(event.get());
 			glm::vec3 dir(cos(fire->rotation), sin(fire->rotation), 0.f);
 			auto bullet = std::make_unique<PlayerBullet>(fire->position, dir);
-			//bullet->id = NextID();
+			bullet->networkID = NetworkEngine::GetInstance().GenerateID(); 
+
+			NetworkObject* rawBullet = bullet.get();
 			gameObjects.push_back(std::move(bullet));
+			networkedObjects[rawBullet->networkID] = rawBullet;
+
 
 			// network engine need to broadcast all these events
 			break;
@@ -244,6 +289,68 @@ void AsteroidScene::ProcessEvents() {
 			std::cout << "Client asteroid spawned at: " << spawnEvent->initialPosition.x << ", " << spawnEvent->initialPosition.y << "\n";
 			break;
 		}
+		case EventType::Collision: {
+			auto* collision = static_cast<CollisionEvent*>(event.get());
+			NetworkID idA = collision->idA;
+			NetworkID idB = collision->idB;
+
+			//std::cout << "[CollisionEvent] Received. Objects to delete: ID A = " << idA << ", ID B = " << idB << "\n";
+
+			//set to store which network ID to delete
+			std::unordered_set<NetworkID> idsToDelete;
+
+			//Check btwn idA and idB
+			NetworkID ids[2] = { idA, idB };
+			for (int i = 0; i < 2; ++i) {
+				NetworkID id = ids[i];
+				auto it = networkedObjects.find(id);
+				
+				if (it != networkedObjects.end()) {
+					auto* obj = it->second;
+					if (auto* player = dynamic_cast<Player*>(obj)) {
+						if (player->isLocal) {
+							//std::cout << "[SKIP] Tried to delete local player with ID " << id << " — skipping\n";
+							continue;
+						}
+					}
+					//std::cout << "[Delete] Deleting object with ID " << id << ", type: " << typeid(*obj).name() << "\n";
+					idsToDelete.insert(id);
+				}
+			}
+
+			//Remove obj from main gameObjects list
+			auto it = std::remove_if(gameObjects.begin(), gameObjects.end(),
+				[&](const std::unique_ptr<GameObject>& go) {
+					auto* netObj = dynamic_cast<NetworkObject*>(go.get());
+					return netObj && idsToDelete.count(netObj->networkID);
+				});
+			gameObjects.erase(it, gameObjects.end());
+
+			//remove from networkObjects map
+			for (NetworkID id : idsToDelete) {
+				networkedObjects.erase(id);
+			}
+
+			//Host sends the collision even to all clients so it delets the same obj
+			if (NetworkEngine::GetInstance().isHosting) {
+				std::vector<char> packet;
+				packet.push_back(NetworkEngine::CMDID::GAME_EVENT);
+				packet.push_back(1); // one event
+				packet.push_back(static_cast<char>(EventType::Collision));
+
+				NetworkID netIDA = htonl(idA);
+				NetworkID netIDB = htonl(idB);
+				packet.insert(packet.end(), reinterpret_cast<char*>(&netIDA), reinterpret_cast<char*>(&netIDA) + sizeof(netIDA));
+				packet.insert(packet.end(), reinterpret_cast<char*>(&netIDB), reinterpret_cast<char*>(&netIDB) + sizeof(netIDB));
+
+				//std::cout << "[Host] Sending CollisionEvent to clients (IDs: " << idA << ", " << idB << ")\n";
+				//Send the packet to the clients
+				NetworkEngine::GetInstance().SendToAllClients(packet);
+			}
+
+			break;
+		}
+
 		default: break;
 		}
 	}
