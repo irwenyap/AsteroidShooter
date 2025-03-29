@@ -283,7 +283,7 @@ void NetworkEngine::HandlePacket(const char* buffer, int bytesRead, const sockad
 
 	}
 	else if (isClient && isConnected) {
-		// --- Client Packet Handling ---
+		// Client Packet Handling
 		// Only accept packets from the known host address
 		if (senderAddr.sin_addr.s_addr != hostAddress.sin_addr.s_addr || senderAddr.sin_port != hostAddress.sin_port) {
 			std::cerr << "Received packet from unexpected address. Ignoring.\n";
