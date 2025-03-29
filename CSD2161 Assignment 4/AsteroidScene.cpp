@@ -180,7 +180,7 @@ void AsteroidScene::ProcessEvents() {
 			auto newPlayer = std::make_unique<Player>();
 			newPlayer->networkID = spawnEvent->networkID;
 			newPlayer->position = glm::vec3(0, 0, 0);
-			newPlayer->scale = glm::vec3(1.f, 1.f, 1.f);
+			newPlayer->scale = glm::vec3(1.5f, 1.5f, 1.5f);
 			newPlayer->rotation = 0.f;
 			newPlayer->meshType = Mesh::MESH_TYPE::QUAD;
 			newPlayer->isLocal = true;
