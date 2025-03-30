@@ -78,15 +78,18 @@ void NetworkEngine::Update(double) {
 			}
 		}
 	} else if (isClient) {
+
+		// Client-side heartbeat sending
+		auto now = std::chrono::steady_clock::now();
+		if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastHeartbeatSentTime).count() >= HEARTBEAT_INTERVAL_MS) {
+			char heartbeatCmd = CMDID::HEARTBEAT;
+			socketManager.SendToHost(heartbeatCmd);
+			lastHeartbeatSentTime = now;
+		}
+
 		while (socketManager.ReceiveFromHost(data)) {
 
-			// Client-side heartbeat sending
-			auto now = std::chrono::steady_clock::now();
-			if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastHeartbeatSentTime).count() >= HEARTBEAT_INTERVAL_MS) {
-				char heartbeatCmd = CMDID::HEARTBEAT;
-				socketManager.SendToHost(heartbeatCmd);
-				lastHeartbeatSentTime = now;
-			}
+			
 
 			if (data.empty()) continue;
 
