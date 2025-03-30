@@ -305,129 +305,73 @@ void NetworkEngine::HandlePacket(const char* buffer, int bytesRead, const sockad
 	}
 }
 
+// Host handles packet received FROM a specific client
+void NetworkEngine::HandleClientPacket(ClientNetworkState& clientState, ChannelId channel, SequenceNumber sequence, const char* payload, size_t payloadSize) {
+	// Basic validation
+	if (channel >= ChannelId::MAX_CHANNELS) {
+		std::cerr << "Invalid Channel ID " << static_cast<int>(channel) << " from client " << clientState.clientId << std::endl;
+		return;
+	}
+	const auto& config = channelConfigs.at(channel); // Use .at() for bounds check
 
+	// --- NACK Channel ---
+	if (channel == ChannelId::ACKNACK_RELIABLE) {
+		HandleNackPacket(payload, payloadSize, clientState);
+		// TODO: Handle potential ACKs if using them
+		return;
+	}
 
+	// --- Sequence Number Handling (for packets FROM client) ---
+	// This part is important if clients send reliable/ordered data (like input)
+	// Simplified example: Assume only PlayerUpdate is received for now
+	if (config.isReliable) {
+		// Implement sequence checking similar to HandleHostPacket if needed
+	}
 
-static uint32_t myPlayerID; // temp
-bool NetworkEngine::Connect(std::string host, std::string portNumber) {
-#pragma region old stuff
-	//addrinfo tcpHints{};
-	//SecureZeroMemory(&tcpHints, sizeof(tcpHints));
-	//tcpHints.ai_family = AF_INET;
-	//tcpHints.ai_socktype = SOCK_STREAM;
-	//tcpHints.ai_protocol = IPPROTO_TCP;
+	if (config.isSequenced && !config.isReliable) { // e.g., PlayerUpdate
+		ClientChannelState& chanState = clientState.receiveState[channel]; // Track received seq from client
+		if (sequence > chanState.lastReceivedSequence) {
+			chanState.lastReceivedSequence = sequence;
+			// Process PlayerUpdate - directly or via queue
+			// Assuming PlayerUpdate includes NetworkID
+			if (payloadSize > sizeof(NetworkID)) {
+				NetworkID senderId;
+				memcpy(&senderId, payload, sizeof(NetworkID)); // Assuming ID is first in payload
+				senderId = ntohl(senderId);
 
-	//addrinfo* tcpInfo = nullptr;
-	//int errorCode = getaddrinfo(host.c_str(), portNumber.c_str(), &tcpHints, &tcpInfo);
-	//if ((NO_ERROR != errorCode) || (nullptr == tcpInfo)) {
-	//	std::cerr << "getaddrinfo() failed for TCP." << std::endl;
-	//	WSACleanup();
-	//	return false;
-	//}
+				if (senderId != clientState.clientId) {
+					std::cerr << "Warning: Client " << clientState.clientId << " sent update for ID " << senderId << std::endl;
+					// Ignore or handle appropriately
+				}
+				else {
+					// Create event or directly update state
+					std::vector<char> updateData(payload, payload + payloadSize);
+					EventQueue::GetInstance().Push(std::make_unique<PlayerUpdate>(updateData)); // Push raw data for now
 
-	//clientTCPSocket = socket(
-	//	tcpInfo->ai_family,
-	//	tcpInfo->ai_socktype,
-	//	tcpInfo->ai_protocol);
-	//if (INVALID_SOCKET == clientTCPSocket) {
-	//	std::cerr << "socket() failed." << std::endl;
-	//	freeaddrinfo(tcpInfo);
-	//	WSACleanup();
-	//	return false;
-	//}
+					// --- Broadcast to other clients ---
+					// Prepend header for broadcasting
+					std::vector<char> broadcastPayload;
+					broadcastPayload.push_back(NetworkEngine::CMDID::GAME_DATA); // Old style, maybe change
+					// Need to re-serialize with correct structure if broadcasting PlayerUpdate event
+					broadcastPayload.insert(broadcastPayload.end(), updateData.begin(), updateData.end());
 
-	//errorCode = connect(
-	//	clientTCPSocket,
-	//	tcpInfo->ai_addr,
-	//	static_cast<int>(tcpInfo->ai_addrlen));
-	//if (SOCKET_ERROR == errorCode) {
-	//	std::cerr << "connect() failed." << std::endl;
-	//	freeaddrinfo(tcpInfo);
-	//	closesocket(clientTCPSocket);
-	//	WSACleanup();
-	//	return false;
-	//}
-
-
-	//addrinfo udpHints{};
-	//SecureZeroMemory(&udpHints, sizeof(udpHints));
-	//udpHints.ai_family = AF_INET;
-	//udpHints.ai_socktype = SOCK_DGRAM;
-	//udpHints.ai_protocol = IPPROTO_UDP;
-
-	//addrinfo* udpInfo = nullptr;
-	//int errorCode = getaddrinfo(host.c_str(), portNumber.c_str(), &udpHints, &udpInfo);
-	//if ((NO_ERROR != errorCode) || (nullptr == udpInfo)) {
-	//	std::cerr << "getaddrinfo() failed for UDP. Error code: " << errorCode << "\n";
-	//	WSACleanup();
-	//	return false;
-	//}
-
-	//clientUDPSocket = socket(
-	//	udpInfo->ai_family,
-	//	udpInfo->ai_socktype,
-	//	udpInfo->ai_protocol);
-	//if (INVALID_SOCKET == clientUDPSocket) {
-	//	std::cerr << "socket() failed for UDP.\n";
-	//	freeaddrinfo(udpInfo);
-	//	WSACleanup();
-	//	return false;
-	//}
-
-	//const int maxRetries = 5;
-	//int retryCount = 0;
-	//bool connectionEstablished = false;
-	//CMDID cmd = REQ_CONNECTION;
-	//fd_set readfds;
-	//timeval timeout = { 1, 0 }; // 1 second timeout for each attempt
-
-	//while (!connectionEstablished && retryCount < maxRetries) {
-	//	// send REQ_CONNECTION to the server
-	//	int sendResult = sendto(clientUDPSocket, reinterpret_cast<char*>(&cmd), sizeof(cmd), 0, udpInfo->ai_addr, (int)udpInfo->ai_addrlen);
-	//	if (sendResult == SOCKET_ERROR) {
-	//		std::cerr << "sendto() failed. Error code: " << WSAGetLastError() << "\n";
-	//		freeaddrinfo(udpInfo);
-	//		closesocket(clientUDPSocket);
-	//		WSACleanup();
-	//		return false;
-	//	}
-
-	//	FD_ZERO(&readfds);
-	//	FD_SET(clientUDPSocket, &readfds);
-	//	int selResult = select(0, &readfds, NULL, NULL, &timeout);
-	//	if (selResult > 0 && FD_ISSET(clientUDPSocket, &readfds)) {
-	//		//CMDID response = UNKNOWN;
-	//		char buffer[100];
-	//		sockaddr_in serverAddr;
-	//		int addrLen = sizeof(serverAddr);
-	//		int recvResult = recvfrom(clientUDPSocket, buffer, sizeof(buffer), 0, reinterpret_cast<sockaddr*>(&serverAddr), &addrLen);
-	//		if (recvResult > 0 && buffer[0] == RSP_CONNECTION) {
-	//			connectionEstablished = true;
-	//			//std::memcpy(&myPlayerID, my)
-	//			serverInfo.address = serverAddr;
-	//			std::cout << "Received RSP_CONNECTION from server.\n";
-	//			break;
-	//		}
-	//	}
-	//	retryCount++;
-	//	std::cout << "Retry " << retryCount << "...\n";
-	//}
-	//freeaddrinfo(udpInfo);
-
-	//if (!connectionEstablished) {
-	//	std::cerr << "Failed to establish connection after retries.\n";
-	//	closesocket(clientUDPSocket);
-	//	clientUDPSocket = INVALID_SOCKET;
-	//	return false;
-	//}
-
-	//u_long nonBlocking = 1;
-	//ioctlsocket(clientUDPSocket, FIONBIO, &nonBlocking);
-
-	//return true;
-#pragma endregion
-	return socketManager.ConnectWithHandshake(host, portNumber, 
-		CMDID::REQ_CONNECTION, CMDID::RSP_CONNECTION);
+					// Use the appropriate channel for broadcasting updates
+					Broadcast(ChannelId::UNRELIABLE_ORDERED, broadcastPayload, clientState.clientId);
+				}
+			}
+		}
+		else {
+			// Old sequence, discard
+		}
+	}
+	else if (channel == ChannelId::RELIABLE_ORDERED) {
+		// Example: Client sent PlayerInput command reliably/ordered
+		// Implement full reliable/ordered receive logic here for client input processing
+		// Queue the input command associated with clientState.clientId for processing in TickSimulation
+	}
+	else {
+		std::cout << "Host received unhandled packet type on channel " << static_cast<int>(channel) << " from client " << clientState.clientId << std::endl;
+	}
 }
 
 void NetworkEngine::Exit() {
