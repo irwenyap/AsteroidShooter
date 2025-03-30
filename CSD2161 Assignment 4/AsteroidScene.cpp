@@ -16,10 +16,14 @@ const double asteroidSpawnRate = 5.0;
 double asteroidSpawnTimer = 0.0;
 bool gameStarted = false;
 
+AsteroidScene* g_AsteroidScene = nullptr;
+
 
 void AsteroidScene::Initialize() {
 	GraphicsEngine::GetInstance().Init();
 	gameObjects.reserve(MAX_LOCAL_GAMEOBJECTS);
+
+	g_AsteroidScene = this; // Set the global pointer
 }
 
 void AsteroidScene::Update(double dt) {
@@ -184,7 +188,7 @@ void AsteroidScene::ProcessEvents() {
 				Player* rawPlayerPtr = localPlayer.get();
 				gameObjects.push_back(std::move(localPlayer));
 				networkedObjects[rawPlayerPtr->networkID] = rawPlayerPtr;
-				packet.push_back(static_cast<char>(EventType::ConnectedPlayer));
+				packet.push_back(static_cast<char>(EventType::PlayerJoined));
 				NetworkID netNID = htonl(rawPlayerPtr->networkID);
 				packet.insert(packet.end(), reinterpret_cast<char*>(&netNID),
 					reinterpret_cast<char*>(&netNID) + sizeof(netNID));
@@ -205,7 +209,7 @@ void AsteroidScene::ProcessEvents() {
 				Player* rawRemote = remotePlayer.get();
 				gameObjects.push_back(std::move(remotePlayer));
 				networkedObjects[rawRemote->networkID] = rawRemote;
-				packet.push_back(static_cast<char>(EventType::ConnectedPlayer));
+				packet.push_back(static_cast<char>(EventType::PlayerJoined));
 				NetworkID netNID = htonl(rawRemote->networkID);
 				packet.insert(packet.end(), reinterpret_cast<char*>(&netNID),
 					reinterpret_cast<char*>(&netNID) + sizeof(netNID));
@@ -241,8 +245,8 @@ void AsteroidScene::ProcessEvents() {
 			networkedObjects[rawPlayerPtr->networkID] = dynamic_cast<NetworkObject*>(rawPlayerPtr);
 			break;
 		}
-		case EventType::ConnectedPlayer: {
-			auto* joinEvent = static_cast<ConnectedPlayerEvent*>(event.get());
+		case EventType::PlayerJoined: {
+			auto* joinEvent = static_cast<PlayerJoinedEvent*>(event.get());
 			auto newPlayer = std::make_unique<Player>();
 			newPlayer->networkID = joinEvent->networkID;
 			newPlayer->position = glm::vec3(0, 0, 0);
@@ -350,6 +354,12 @@ void AsteroidScene::ProcessEvents() {
 
 			break;
 		}
+		case EventType::PlayerLeft: {
+			auto* playerLeft = static_cast<PlayerLeftEvent*>(event.get());
+			std::cout << "[Scene] Processing PlayerLeftEvent for NetworkID: " << playerLeft->networkID << std::endl;
+			RemoveGameObject(playerLeft->networkID);
+			break;
+		}
 
 		default: break;
 		}
@@ -362,4 +372,52 @@ void AsteroidScene::Render() {
 
 void AsteroidScene::Exit() {
 	gameObjects.clear();
+
+	g_AsteroidScene = nullptr; // Clear the global pointer
 }
+
+std::unordered_map<NetworkID, NetworkObject*>& AsteroidScene::GetNetworkedObjects() {
+	return networkedObjects;
+	
+}
+
+NetworkObject * AsteroidScene::GetNetworkedObject(NetworkID id) {
+	auto it = networkedObjects.find(id);
+	if (it != networkedObjects.end()) {
+		return it->second;
+		
+	}
+	return nullptr;
+	
+}
+
+void AsteroidScene::AddGameObject(std::unique_ptr<GameObject> obj, NetworkObject * netObj) {
+	if (netObj) {
+		// Check if ID already exists due to race conditions
+		if (networkedObjects.count(netObj->networkID)) {
+		std::cerr << "[Scene] Warning: NetworkObject with ID " << netObj->networkID << " already exists. Replacing." << std::endl;
+			     // Consider removing the old one first if necessary
+				RemoveGameObject(netObj->networkID);
+			
+		}
+		networkedObjects[netObj->networkID] = netObj;
+		std::cout << "[Scene] Added NetworkObject with ID: " << netObj->networkID << std::endl;
+		
+	}
+	 gameObjects.push_back(std::move(obj));
+}
+
+void AsteroidScene::RemoveGameObject(NetworkID id) {
+	std::cout << "[Scene] Attempting to remove GameObject with NetworkID: " << id << std::endl;
+	networkedObjects.erase(id);
+	
+		// Remove from the main gameObjects vector
+		gameObjects.erase(std::remove_if(gameObjects.begin(), gameObjects.end(),
+			[id](const std::unique_ptr<GameObject>& obj) {
+				// Check if the GameObject is also a NetworkObject and has the matching ID
+				NetworkObject * netObj = dynamic_cast<NetworkObject*>(obj.get());
+				return netObj && netObj->networkID == id;
+				}), gameObjects.end());
+	
+}
+

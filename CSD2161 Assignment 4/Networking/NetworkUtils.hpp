@@ -22,13 +22,13 @@ namespace NetworkUtils {
         packet.insert(packet.end(), rawData, rawData + sizeof(T));
     }
 
-    uint32_t FloatToNetwork(float f) {
+    inline uint32_t FloatToNetwork(float f) {
         union { float f; uint32_t i; } u;
         u.f = f;
         return u.i;
     }
 
-    void WriteVec3(std::vector<char>& packet, const glm::vec3 vec) {
+    inline void WriteVec3(std::vector<char>& packet, const glm::vec3 vec) {
         WriteToPacket(packet, FloatToNetwork(vec.x), DATA_TYPE::DT_LONG);
         WriteToPacket(packet, FloatToNetwork(vec.y), DATA_TYPE::DT_LONG);
         WriteToPacket(packet, FloatToNetwork(vec.z), DATA_TYPE::DT_LONG);
@@ -46,13 +46,13 @@ namespace NetworkUtils {
         }
     }
 
-    float NetworkToFloat(uint32_t i) {
+    inline float NetworkToFloat(uint32_t i) {
         union { float f; uint32_t i; } u;
         u.i = i;
         return u.f;
     }
 
-    void ReadVec3(const char* packet, size_t offset, glm::vec3& vec) {
+    inline void ReadVec3(const char* packet, size_t offset, glm::vec3& vec) {
         uint32_t tmp;
         NetworkUtils::ReadFromPacket(packet, offset, tmp, DATA_TYPE::DT_LONG);
         vec.x = NetworkToFloat(tmp);

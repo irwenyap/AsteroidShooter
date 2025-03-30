@@ -3,9 +3,8 @@
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include "InputManager.hpp"
-#include "Events/EventQueue.hpp"
 #include "Networking/NetworkEngine.hpp"
-#include "Networking/NetworkUtils.hpp"
+#include "Events/Event.hpp"
 #include <iostream>
 #include <glm/geometric.hpp>
 #include <glm/gtc/constants.hpp>
@@ -46,7 +45,11 @@ void Player::Update(double dt)
         position += velocity * static_cast<float>(dt);
 
         if (input.GetKeyDown(GLFW_KEY_SPACE)) {
-            EventQueue::GetInstance().Push(std::make_unique<FireBulletEvent>(position, rotation, id));
+            // Don't push locally, send to server for lockstep
+            auto fireEvent = std::make_unique<FireBulletEvent>(position, rotation, networkID);
+            NetworkEngine::GetInstance().SendEventToServer(std::move(fireEvent));
+            
+            // EventQueue::GetInstance().Push(std::make_unique<FireBulletEvent>(position, rotation, networkID)); // OLD WAY
         }
 
         if (glm::length(position - prevPos) > 1.f) {

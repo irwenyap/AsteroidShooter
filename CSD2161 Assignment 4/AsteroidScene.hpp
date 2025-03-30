@@ -14,6 +14,11 @@ public:
 	void ProcessEvents();
 	void Render();
 	void Exit();
+
+	std::unordered_map<NetworkID, NetworkObject*>& GetNetworkedObjects();
+	NetworkObject* GetNetworkedObject(NetworkID id);
+	void AddGameObject(std::unique_ptr<GameObject> obj, NetworkObject* netObj); // To add objects received over network
+	void RemoveGameObject(NetworkID id); // To remove objects (e.g., on PlayerLeft)
 	
 private:
 	std::vector<std::unique_ptr<GameObject>> gameObjects;

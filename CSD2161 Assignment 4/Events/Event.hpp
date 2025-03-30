@@ -4,21 +4,36 @@
 #include <glm/vec3.hpp>
 #include <WinSock2.h>
 #include "../Networking/NetworkObject.hpp"
-using NetworkID = uint32_t;
+#include "../Networking/NetworkUtils.hpp" // Include for serialization utils
 
+using NetworkID = uint32_t;
+using EventID = uint32_t;
 
 enum class EventType {
-    StartGame,
-    SpawnPlayer,
-    ConnectedPlayer,
-    FireBullet,
-    SpawnAsteroid,
-    PlayerUpdate,
-    Collision
+    //Control
+    RequestStartGame, //Client ask host to start the game
+    StartGame, // Host starts the game (confirmation)
+
+    //State
+    PlayerJoined, //Info about player joining (broadcast by host) 
+    PlayerLeft, //Info about player leaving (broadcast by host)
+    SpawnPlayer, //Host spawns a player
+    SpawnAsteroid, //Host spawns an asteroid
+
+    //Actions
+    FireBullet, //Player fires a bullet
+	Collision, //Collision between two objects
+
+    PlayerUpdate, //Player position update
+
+    //Rendering
+    RenderBullet, //Render bullet
+    RenderAsteroid, //Render asteroid
 };
 
 struct GameEvent {
     EventType type;
+    EventID id;
     virtual ~GameEvent() = default;
 };
 
@@ -31,6 +46,17 @@ struct FireBulletEvent : public GameEvent {
         : position(pos), rotation(rot), ownerId(owner)
     {
         type = EventType::FireBullet;
+    }
+
+    // Simple serialization for FireBulletEvent
+    std::vector<char> Serialize() const {
+        std::vector<char> data;
+        // Type is handled by the wrapper message (GAME_EVENT / BROADCAST_EVENT)
+        NetworkUtils::WriteVec3(data, position);
+        NetworkUtils::WriteToPacket(data, NetworkUtils::FloatToNetwork(rotation), NetworkUtils::DATA_TYPE::DT_LONG);
+        uint32_t netOwnerId = htonl(ownerId);
+        NetworkUtils::WriteToPacket(data, netOwnerId, NetworkUtils::DATA_TYPE::DT_LONG);
+        return data;
     }
 };
 
@@ -50,15 +76,24 @@ struct SpawnPlayerEvent : public GameEvent {
     }
 };
 
-struct ConnectedPlayerEvent : public GameEvent {
+struct PlayerJoinedEvent : public GameEvent {
     uint32_t networkID;
     glm::vec3 initialPosition;
     float initialRotation;
 
-    ConnectedPlayerEvent(uint32_t id) : networkID(id)
+    PlayerJoinedEvent(uint32_t id) : networkID(id)
     {
-        type = EventType::ConnectedPlayer;
+        type = EventType::PlayerJoined;
     }
+};
+
+struct PlayerLeftEvent : public GameEvent {
+	uint32_t networkID;
+
+	PlayerLeftEvent(uint32_t id) : networkID(id)
+	{
+		type = EventType::PlayerLeft;
+	}
 };
 
 struct SpawnAsteroidEvent : public GameEvent {
