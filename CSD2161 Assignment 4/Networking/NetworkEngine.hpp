@@ -55,10 +55,11 @@ public:
 	void SendToOtherClients(const sockaddr_in& reqClient, std::vector<char> packet);
 	void HandleIncomingConnection(const std::vector<char>& data, const sockaddr_in& clientAddr);
 	void HandleClientEvent(const std::vector<char>& data); //tmp hack for server to send to itself
-	//void SendTickSync(Tick&);
+	void SendTickSync();
 	void ProcessTickSync(Tick&, Tick&);
 	//void SendPacket(std::vector<char>);
 	size_t GetNumConnectedClients() const;
+	void ServerBroadcastEvent(std::unique_ptr<GameEvent> event);
 
 	inline std::string GetIPAddress() { return socketManager.GetLocalIP(); }
 	inline NetworkID GenerateID() { return nextID++; }
@@ -69,9 +70,9 @@ public:
 	ClientManager clientManager;
 	SocketManager socketManager;
 
-	void ServerBroadcastEvent(std::unique_ptr<GameEvent> event);
-
-public:
+	Tick simulationTick = 0; // global tick tracker
+	Tick localTick = simulationTick; // for client
+private:
 	NetworkEngine() = default;
 	~NetworkEngine() = default;
 

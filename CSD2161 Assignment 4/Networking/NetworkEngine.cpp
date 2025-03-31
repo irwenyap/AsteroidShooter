@@ -18,8 +18,8 @@
 #define WINSOCK_SUBVERSION  2
 #define MAX_STR_LEN         1000
 
-extern Tick simulationTick;
-extern Tick localTick;
+//extern Tick simulationTick;
+//extern Tick localTick;
 
 // HACK: Temporary global scene pointer for state sync.
 extern AsteroidScene * g_AsteroidScene;
@@ -45,6 +45,10 @@ void NetworkEngine::Update(double) {
 	sockaddr_in sender{};
 
 	if (isHosting) {
+
+		if (simulationTick % 120 == 0) { // Every 120 ticks (2 second) send sync.
+			SendTickSync();
+		}
 
 		// Resend packets that have timed out
 		CheckAckTimeouts();
@@ -359,6 +363,14 @@ void NetworkEngine::HandleIncomingConnection(const std::vector<char>& data, cons
 
 		}
 	}
+}
+
+void NetworkEngine::SendTickSync() {
+	std::vector<char> packet;
+	packet.reserve(5);
+	packet.push_back(CMDID::TICK_SYNC);
+	NetworkUtils::WriteToPacket(packet, simulationTick, NetworkUtils::DATA_TYPE::DT_LONG);
+	SendToAllClients(packet);
 }
 
 void NetworkEngine::HandleClientEvent(const std::vector<char>& data) {

@@ -27,6 +27,9 @@ void AsteroidScene::Initialize() {
 }
 
 void AsteroidScene::Update(double dt) {
+	std::cout << NetworkEngine::GetInstance().localTick << std::endl;
+
+
 	for (auto& go : gameObjects) {
 		go->Update(dt);
 	}
