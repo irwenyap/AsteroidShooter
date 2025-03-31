@@ -152,7 +152,7 @@ void AsteroidScene::FixedUpdate(double fixedDT) {
 
 			//Push a collisionEvent into event queue of both objects
 			if (dist < collisionDist) {
-				if (NetworkEngine().GetInstance().isHosting) {
+				if (NetworkEngine::GetInstance().isHosting) {
 					std::vector<char> packet;
 					packet.push_back(NetworkEngine::CMDID::GAME_EVENT);
 					packet.push_back(static_cast<char>(EventType::Collision));
@@ -164,7 +164,7 @@ void AsteroidScene::FixedUpdate(double fixedDT) {
 
 					NetworkEngine::GetInstance().HandleClientEvent(packet);
 				}
-				else if (NetworkEngine().GetInstance().isClient) {
+				else if (NetworkEngine::GetInstance().isClient) {
 					auto collision = std::make_unique<CollisionEvent>(bullet->networkID, asteroid->networkID);
 					NetworkEngine::GetInstance().SendEventToServer(std::move(collision));
 				}
