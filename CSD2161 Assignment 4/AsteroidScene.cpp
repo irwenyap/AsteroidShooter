@@ -157,8 +157,7 @@ void AsteroidScene::ProcessEvents() {
 			auto* fire = static_cast<FireBulletEvent*>(event.get());
 			glm::vec3 dir(cos(fire->rotation), sin(fire->rotation), 0.f);
 			auto bullet = std::make_unique<PlayerBullet>(fire->position, dir);
-			bullet->networkID = NetworkEngine::GetInstance().GenerateID(); 
-
+			bullet->networkID = event.get()->id;
 			NetworkObject* rawBullet = bullet.get();
 			gameObjects.push_back(std::move(bullet));
 			networkedObjects[rawBullet->networkID] = rawBullet;

@@ -61,6 +61,7 @@ public:
 
 	inline std::string GetIPAddress() { return socketManager.GetLocalIP(); }
 	inline NetworkID GenerateID() { return nextID++; }
+	inline EventID GenerateEventID() { return nextEventID++; }
 
 	bool isHosting = false;
 	bool isClient = false;

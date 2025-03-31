@@ -439,8 +439,9 @@ void NetworkEngine::HandleAckEvent(const std::vector<char>& data, const sockaddr
 		std::vector<char> commitPacket;
 		commitPacket.push_back(CMDID::COMMIT_EVENT);
 		EventID netEventID = htonl(eventID);
+		NetworkID newNetworkID = htonl(nextID++);
 		commitPacket.insert(commitPacket.end(), reinterpret_cast<char*>(&netEventID), reinterpret_cast<char*>(&netEventID) + sizeof(netEventID));
-
+		commitPacket.insert(commitPacket.end(), reinterpret_cast<char*>(&newNetworkID), reinterpret_cast<char*>(&newNetworkID) + sizeof(newNetworkID));
 		// Send commit command to all clients
 		SendToAllClients(commitPacket);
 
@@ -487,6 +488,10 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 	std::memcpy(&eventID, &data[1], sizeof(EventID));
 	eventID = ntohl(eventID);
 
+	NetworkID networkID;
+	std::memcpy(&networkID, &data[1 + sizeof(EventID)], sizeof(NetworkID));
+	networkID = ntohl(networkID);
+
 	std::cout << "[Client] Received COMMIT_EVENT for ID: " << eventID << std::endl;
 
 
@@ -528,8 +533,10 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 		NetworkUtils::ReadFromPacket(eventData.data(), offset, tempOwner, NetworkUtils::DATA_TYPE::DT_LONG); offset += 4;
 		ownerId = tempOwner;
 
+		auto it = std::make_unique<FireBulletEvent>(pos, rot, ownerId);
+		it->id = networkID;
 
-		EventQueue::GetInstance().Push(std::make_unique<FireBulletEvent>(pos, rot, ownerId));
+		EventQueue::GetInstance().Push(std::move(it));
 		break;
 	}
 							  // Add cases for other lockstepped events here...
