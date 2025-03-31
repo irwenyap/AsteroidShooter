@@ -46,6 +46,9 @@ void NetworkEngine::Update(double) {
 
 	if (isHosting) {
 
+		// Resend packets that have timed out
+		CheckAckTimeouts();
+
 		// Check for client timeouts and timed-out events before processing new packets
 		CheckTimeoutsAndHeartbeats();
 
@@ -422,10 +425,11 @@ void NetworkEngine::HandleAckEvent(const std::vector<char>& data, const sockaddr
 	auto insertResult = pendingInfo.acksReceived.insert(senderClientID);
 
 	if (insertResult.second) { // Check if insert actually happened (avoid double counting)
-		std::cout << "[Host] Received ACK for Event ID: " << eventID << " from Client " << senderClientID
-			<< " (" << pendingInfo.acksReceived.size() << "/" << clientManager.GetClients().size() << ")" << std::endl;
+		std::cout 
+			<< "[Host] Received ACK for Event ID: " << eventID << " from Client " << senderClientID
+			<< " (" << pendingInfo.acksReceived.size() << "/" << clientManager.GetClients().size() << ")" 
+			<< std::endl;
 	}
-
 
 	// Check if all connected clients have ACKed
 	if (pendingInfo.acksReceived.size() >= GetNumConnectedClients()) {
@@ -455,12 +459,15 @@ void NetworkEngine::HandleBroadcastEvent(const std::vector<char>& data) {
 
 	EventType eventType = static_cast<EventType>(data[1 + sizeof(EventID)]);
 
-	std::cout << "[Client] Received BROADCAST_EVENT (Type: " << static_cast<int>(eventType) << ") ID: " << eventID << std::endl;
-
-
-	// Store the event data (excluding CMDID and EventID) for later processing
-	// Start copying after the EventID
-	pendingClientEvents[eventID].assign(data.begin() + 1 + sizeof(EventID), data.end());
+	if (pendingClientEvents.find(eventID) != pendingClientEvents.end()) {
+		std::cerr << "[Client] Received duplicate BROADCAST_EVENT for ID: " << eventID << std::endl;
+	}
+	else {
+		std::cout << "[Client] Received BROADCAST_EVENT (Type: " << static_cast<int>(eventType) << ") ID: " << eventID << std::endl;
+		// Store the event data (excluding CMDID and EventID) for later processing
+		// Start copying after the EventID
+		pendingClientEvents[eventID].assign(data.begin() + 1 + sizeof(EventID), data.end());
+	}
 
 	// Send ACK back to host
 	std::vector<char> ackPacket;
@@ -600,6 +607,25 @@ void NetworkEngine::CheckTimeoutsAndHeartbeats() {
 	// Remove timed-out events
 	for (EventID id : eventsToTimeout) {
 		pendingAcks.erase(id);
+	}
+}
+
+void NetworkEngine::CheckAckTimeouts() 
+{
+	static constexpr int ACK_TIMEOUT_MS = 3000; // 3 second
+
+	for (auto& [eventID, pendingInfo] : pendingAcks) {
+		auto timeSinceBroadcast = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - pendingInfo.broadcastTime).count();
+		if (timeSinceBroadcast > ACK_TIMEOUT_MS) {
+			for (auto& client : clientManager.GetClients()) {
+				if (pendingInfo.acksReceived.find(client.clientID) == pendingInfo.acksReceived.end()) {
+					std::cerr << "[Host] ACK timeout for Event ID: " << eventID << " from Client " << client.clientID << std::endl;
+					// Resend the event to the client
+					SendToClient(client, pendingInfo.eventData);
+					pendingInfo.broadcastTime = std::chrono::steady_clock::now(); // Update the broadcast time
+				}
+			}
+		}
 	}
 }
 

@@ -82,6 +82,8 @@ private:
 	void HandleBroadcastEvent(const std::vector<char>&data); // Client side
 	void HandleCommitEvent(const std::vector<char>&data);    // Client side
 	//void HandleInitialStateObject(const std::vector<char>& data); // Client handles incoming state
+	
+	void HandleAckTimeouts(); // Host checks periodically for ACK timeouts
 
 	void CheckTimeoutsAndHeartbeats(); // Host checks periodically
 	//void SendInitialState(const Client & newClient); // Host sends current game state
