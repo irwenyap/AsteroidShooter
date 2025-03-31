@@ -64,6 +64,22 @@ void ShowNetworkUI() {
 		std::string portText = "Port: " + std::string(port);
 		ImGui::Text(portText.c_str());
 
+		extern AsteroidScene* g_AsteroidScene;
+		if (g_AsteroidScene) {
+			ImGui::Separator();
+			ImGui::Text("Scores:");
+
+			const auto& scores = g_AsteroidScene->GetAllScores();
+			if (scores.empty()) {
+				ImGui::Text("No scores yet.");
+			}
+			else {
+				for (const auto& [playerID, score] : scores) {
+					ImGui::Text("Player %u: %d", playerID, score);
+				}
+			}
+		}
+
 		if (ne.isHosting) {
 			if (ImGui::Button("Start Game")) {
 				EventQueue::GetInstance().Push(std::make_unique<RequestStartGameEvent>());
