@@ -164,9 +164,6 @@ void AsteroidScene::ProcessEvents() {
 			gameObjects.push_back(std::move(bullet));
 			networkedObjects[rawBullet->networkID] = rawBullet;
 
-			// network engine need to broadcast all these events
-
-
 			break;
 		}
 		case EventType::RequestStartGame: {

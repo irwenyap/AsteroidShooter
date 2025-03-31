@@ -54,7 +54,6 @@ void Player::Update(double dt)
 			else if (NetworkEngine::GetInstance().isHosting) {
  				NetworkEngine::GetInstance().ServerBroadcastEvent(std::move(fireEvent));
 			}
-
             
             // EventQueue::GetInstance().Push(std::make_unique<FireBulletEvent>(position, rotation, networkID)); // OLD WAY
         }
