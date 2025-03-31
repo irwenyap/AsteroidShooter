@@ -65,33 +65,37 @@ void AsteroidScene::Update(double dt) {
 			packet.insert(packet.end(), reinterpret_cast<char*>(&netNID),
 				reinterpret_cast<char*>(&netNID) + sizeof(netNID));
 
-			int16_t posX = static_cast<int16_t>(asteroid->position.x * 100);
-			int16_t posY = static_cast<int16_t>(asteroid->position.y * 100);
-			posX = htons(posX);
-			posY = htons(posY);
-			packet.insert(packet.end(), reinterpret_cast<char*>(&posX),
-				reinterpret_cast<char*>(&posX) + sizeof(posX));
-			packet.insert(packet.end(), reinterpret_cast<char*>(&posY),
-				reinterpret_cast<char*>(&posY) + sizeof(posY));
+			NetworkUtils::WriteVec3(packet, asteroid->position);
+			NetworkUtils::WriteVec3(packet, asteroid->scale);
+			NetworkUtils::WriteVec3(packet, asteroid->velocity);
 
-			int16_t scaleX = static_cast<int16_t>(asteroid->scale.x * 100);
-			int16_t scaleY = static_cast<int16_t>(asteroid->scale.y * 100);
-			scaleX = htons(scaleX);
-			scaleY = htons(scaleY);
-			packet.insert(packet.end(), reinterpret_cast<char*>(&scaleX),
-				reinterpret_cast<char*>(&scaleX) + sizeof(scaleX));
-			packet.insert(packet.end(), reinterpret_cast<char*>(&scaleY),
-				reinterpret_cast<char*>(&scaleY) + sizeof(scaleY));
+			//int16_t posX = static_cast<int16_t>(asteroid->position.x * 100);
+			//int16_t posY = static_cast<int16_t>(asteroid->position.y * 100);
+			//posX = htons(posX);
+			//posY = htons(posY);
+			//packet.insert(packet.end(), reinterpret_cast<char*>(&posX),
+			//	reinterpret_cast<char*>(&posX) + sizeof(posX));
+			//packet.insert(packet.end(), reinterpret_cast<char*>(&posY),
+			//	reinterpret_cast<char*>(&posY) + sizeof(posY));
+
+			//int16_t scaleX = static_cast<int16_t>(asteroid->scale.x * 100);
+			//int16_t scaleY = static_cast<int16_t>(asteroid->scale.y * 100);
+			//scaleX = htons(scaleX);
+			//scaleY = htons(scaleY);
+			//packet.insert(packet.end(), reinterpret_cast<char*>(&scaleX),
+			//	reinterpret_cast<char*>(&scaleX) + sizeof(scaleX));
+			//packet.insert(packet.end(), reinterpret_cast<char*>(&scaleY),
+			//	reinterpret_cast<char*>(&scaleY) + sizeof(scaleY));
 
 
-			int16_t velX = static_cast<int16_t>(asteroid->velocity.x * 100);
-			int16_t velY = static_cast<int16_t>(asteroid->velocity.y * 100);
-			velX = htons(velX);
-			velY = htons(velY);
-			packet.insert(packet.end(), reinterpret_cast<char*>(&velX),
-				reinterpret_cast<char*>(&velX) + sizeof(velX));
-			packet.insert(packet.end(), reinterpret_cast<char*>(&velY),
-				reinterpret_cast<char*>(&velY) + sizeof(velY));
+			//int16_t velX = static_cast<int16_t>(asteroid->velocity.x * 100);
+			//int16_t velY = static_cast<int16_t>(asteroid->velocity.y * 100);
+			//velX = htons(velX);
+			//velY = htons(velY);
+			//packet.insert(packet.end(), reinterpret_cast<char*>(&velX),
+			//	reinterpret_cast<char*>(&velX) + sizeof(velX));
+			//packet.insert(packet.end(), reinterpret_cast<char*>(&velY),
+			//	reinterpret_cast<char*>(&velY) + sizeof(velY));
 
 			Asteroid* rawAsteroid = asteroid.get();
 			gameObjects.push_back(std::move(asteroid));
