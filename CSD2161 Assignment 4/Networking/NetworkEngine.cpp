@@ -126,92 +126,6 @@ void NetworkEngine::Update(double) {
 			}
 		}
 	}
-
-#pragma region old stuff
-	// Host
-	//if (udpListeningSocket != INVALID_SOCKET) {
-	//	char buffer[100] = { 0 };
-	//	sockaddr_in clientAddr;
-	//	int addrLen = sizeof(clientAddr);
-	//	int recvResult = recvfrom(
-	//		udpListeningSocket, 
-	//		buffer, 
-	//		sizeof(buffer), 
-	//		0, 
-	//		reinterpret_cast<sockaddr*>(&clientAddr), 
-	//		&addrLen);
-	//	if (recvResult > 0) {
-	//		if (buffer[0] == REQ_CONNECTION) {
-	//			std::vector<char> packet;
-	//			CMDID reply = RSP_CONNECTION;
-	//			packet.push_back(reply);
-
-	//			int sendResult = sendto(
-	//				udpListeningSocket,
-	//				packet.data(),
-	//				packet.size(), 0,
-	//				reinterpret_cast<sockaddr*>(&clientAddr),
-	//				addrLen);
-	//			if (sendResult == SOCKET_ERROR) {
-	//				std::cerr << "sendto() for RSP_CONNECTION failed. Error: " << WSAGetLastError() << "\n";
-	//			}
-	//			char ipBuffer[INET_ADDRSTRLEN];
-	//			inet_ntop(
-	//				AF_INET, 
-	//				&(clientAddr.sin_addr), 
-	//				ipBuffer, 
-	//				INET_ADDRSTRLEN);
-	//			std::string clientIP(ipBuffer);
-
-	//			bool exists = false;
-	//			for (const auto& client : clientConnections) {
-	//				if (client.ipAddress == clientIP && ntohs(clientAddr.sin_port) == client.udpPort) {
-	//					exists = true;
-	//					break;
-	//				}
-	//			}
-
-	//			if (!exists) {
-	//				Client newClient;
-	//				newClient.address = clientAddr;
-	//				newClient.ipAddress = clientIP;
-	//				newClient.udpPort = ntohs(clientAddr.sin_port);
-	//				newClient.isConnected = true;
-	//				clientConnections.push_back(newClient);
-	//				std::cout << "Added new client: " << clientIP << ":" << newClient.udpPort << "\n";
-	//				EventQueue::GetInstance().Push(std::make_unique<ClientJoinedEvent>());
-	//			}
-	//		} else if (buffer[0] == GAME_DATA) {
-	//			std::cout << "GAME DATA RECEIVED\n";
-	//			//float test1 = static_cast<float>(static_cast<int8_t>(buffer[1]));
-	//			//float test2 = static_cast<float>(static_cast<int8_t>(buffer[2]));
-	//			//std::cout << test1 << " :BUFFER: " << test2 << std::endl;
-	//			EventQueue::GetInstance().Push(std::make_unique<PlayerUpdate>(buffer, recvResult));
-	//		}
-	//	}
-	//} else if (clientUDPSocket != INVALID_SOCKET) { // Client
-	//	char buffer[1472];
-	//	int addrLen = sizeof(serverInfo.address);
-	//	int recvResult = recvfrom(
-	//		clientUDPSocket,
-	//		buffer,
-	//		sizeof(buffer),
-	//		0,
-	//		reinterpret_cast<sockaddr*>(&serverInfo.address),
-	//		&addrLen);
-
-	//	if (recvResult > 0) {
-	//		if (buffer[0] == TICK_SYNC) {
-	//			//std::cout << "TICK FROM SERVER RECEIVED\n";
-	//			Tick receivedTick;
-	//			std::memcpy(&receivedTick, buffer + 1, sizeof(receivedTick));
-	//			localTick = ntohl(receivedTick);
-	//		} else if (buffer[0] == GAME_DATA) {
-
-	//		}
-	//	}
-	//}
-#pragma endregion
 }
 
 
@@ -237,24 +151,7 @@ bool NetworkEngine::Connect(std::string host, std::string portNumber) {
 	return isClient;
 }
 
-void NetworkEngine::Exit() {
-#pragma region old stuff
-
-
-	// client cleanup
-	//if (clientUDPSocket != INVALID_SOCKET) {
-	//	closesocket(clientUDPSocket);
-	//	clientUDPSocket = INVALID_SOCKET;
-	//}
-
-	//// host cleanup
-	//if (udpListeningSocket != INVALID_SOCKET) {
-	//	closesocket(udpListeningSocket);
-	//	udpListeningSocket = INVALID_SOCKET;
-	//	clientConnections.clear();
-	//}
-#pragma endregion
-	
+void NetworkEngine::Exit() {	
 	socketManager.Cleanup();
 	WSACleanup();
 }
@@ -720,15 +617,3 @@ void NetworkEngine::CheckAckTimeouts()
 		}
 	}
 }
-
-//void NetworkEngine::SendPacket(std::vector<char> packet) {
-//	if (clientUDPSocket != INVALID_SOCKET) {
-//		int sendResult = sendto(
-//			clientUDPSocket,
-//			packet.data(),
-//			static_cast<int>(packet.size()), 
-//			0,
-//			reinterpret_cast<sockaddr*>(&serverInfo.address),
-//			sizeof(serverInfo.address));
-//	}
-//}
