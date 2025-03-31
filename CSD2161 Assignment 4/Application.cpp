@@ -19,7 +19,8 @@
 //static bool isClient = false;
 void ShowNetworkUI() {
 	//static char ipAddress[64] = "127.0.0.1";
-	static char ipAddress[64] = "192.168.0.4";
+	//static char ipAddress[64] = "192.168.0.4";
+	static char ipAddress[64] = "10.5.0.2";
 	static std::string ipAddressString{};
 	static char port[16] = "1234";
 	auto& ne = NetworkEngine::GetInstance();
