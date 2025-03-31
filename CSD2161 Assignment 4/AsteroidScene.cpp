@@ -27,9 +27,9 @@ void AsteroidScene::Initialize() {
 }
 
 void AsteroidScene::Update(double dt) {
-	//for (auto& go : gameObjects) {
-	//	go->Update(dt);
-	//}
+	for (auto& go : gameObjects) {
+		go->Update(dt);
+	}
 	if (gameStarted && NetworkEngine::GetInstance().isHosting) {
 		asteroidSpawnTimer += dt;
 		//std::cout << asteroidSpawnTimer << std::endl;
@@ -108,7 +108,7 @@ void AsteroidScene::Update(double dt) {
 
 void AsteroidScene::FixedUpdate(double fixedDT) {
 	for (auto& go : gameObjects) {
-		go->Update(fixedDT);
+		go->FixedUpdate(fixedDT);
 	}
 
 	// Setting only host to detect for collision

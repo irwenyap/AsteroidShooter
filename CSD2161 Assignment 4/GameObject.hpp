@@ -19,6 +19,7 @@ public:
 	bool textured = false;
 
 	virtual void Update(double) = 0;
+	virtual void FixedUpdate(double) = 0;
 
 	virtual ~GameObject() = default;
 };

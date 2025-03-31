@@ -27,22 +27,22 @@ void Player::Update(double dt)
     if (isLocal) {
         InputManager& input = InputManager::GetInstance();
 
-        // Rotate left/right
-        if (input.GetKey(GLFW_KEY_A)) {
-            rotation += rotationSpeed * static_cast<float>(dt);
-        }
-        if (input.GetKey(GLFW_KEY_D)) {
-            rotation -= rotationSpeed * static_cast<float>(dt);
-        }
+        //// Rotate left/right
+        //if (input.GetKey(GLFW_KEY_A)) {
+        //    rotation += rotationSpeed * static_cast<float>(dt);
+        //}
+        //if (input.GetKey(GLFW_KEY_D)) {
+        //    rotation -= rotationSpeed * static_cast<float>(dt);
+        //}
 
-        if (input.GetKey(GLFW_KEY_W)) {
-            glm::vec2 forward = glm::vec2(cos(rotation), sin(rotation));
-            velocity += glm::vec3(forward * thrust * static_cast<float>(dt), 0.0f);
-        }
+        //if (input.GetKey(GLFW_KEY_W)) {
+        //    glm::vec2 forward = glm::vec2(cos(rotation), sin(rotation));
+        //    velocity += glm::vec3(forward * thrust * static_cast<float>(dt), 0.0f);
+        //}
 
-        velocity *= drag;
+        //velocity *= drag;
 
-        position += velocity * static_cast<float>(dt);
+        //position += velocity * static_cast<float>(dt);
 
         if (input.GetKeyDown(GLFW_KEY_SPACE)) {
             // Don't push locally, send to server for lockstep
@@ -78,6 +78,57 @@ void Player::Update(double dt)
 
         //std::cout << position.x << " :PACKET: " << position.x << std::endl;
     }
+}
+
+void Player::FixedUpdate(double fixedDt) {
+    if (isLocal) {
+        InputManager& input = InputManager::GetInstance();
+
+        // Rotate left/right
+        if (input.GetKey(GLFW_KEY_A)) {
+            rotation += rotationSpeed * static_cast<float>(fixedDt);
+        }
+        if (input.GetKey(GLFW_KEY_D)) {
+            rotation -= rotationSpeed * static_cast<float>(fixedDt);
+        }
+
+        if (input.GetKey(GLFW_KEY_W)) {
+            glm::vec2 forward = glm::vec2(cos(rotation), sin(rotation));
+            velocity += glm::vec3(forward * thrust * static_cast<float>(fixedDt), 0.0f);
+        }
+
+        velocity *= drag;
+
+        position += velocity * static_cast<float>(fixedDt);
+
+        //if (input.GetKeyDown(GLFW_KEY_SPACE)) {
+        //    // Don't push locally, send to server for lockstep
+        //    auto fireEvent = std::make_unique<FireBulletEvent>(position, rotation, networkID);
+        //    NetworkEngine::GetInstance().SendEventToServer(std::move(fireEvent));
+
+        //    // EventQueue::GetInstance().Push(std::make_unique<FireBulletEvent>(position, rotation, networkID)); // OLD WAY
+        //}
+
+        //if (glm::length(position - prevPos) > 1.f) {
+        //    if (NetworkEngine::GetInstance().isClient) {
+        //        NetworkEngine::GetInstance().socketManager.SendToHost(Serialize());
+        //        prevPos = position;
+        //    } else {
+        //        NetworkEngine::GetInstance().SendToAllClients(Serialize());
+        //        prevPos = position;
+        //    }
+        //    //std::cout << "Positional Data Sent\n";
+        //}
+    } 
+    //else {
+    //    float interpSpeed = 5.0f; // higher = faster interpolation
+    //    position = glm::mix(position, targetPos, interpSpeed * static_cast<float>(fixedDt));
+
+    //    if (std::abs(rotation - targetRot) > 0.01f)
+    //        rotation = LerpAngle(rotation, targetRot, interpSpeed * static_cast<float>(fixedDt));
+
+    //    //std::cout << position.x << " :PACKET: " << position.x << std::endl;
+    //}
 }
 
 std::vector<char> Player::Serialize() {
