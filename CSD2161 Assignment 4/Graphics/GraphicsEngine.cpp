@@ -71,8 +71,14 @@ void GraphicsEngine::Init() {
 
     meshes[Mesh::MESH_TYPE::QUAD] = Mesh(vertices, indices);
 
-    textures[Texture::TEXTURE_TYPE::TEX_ASTEROID] = LoadTexture("../Assets/asteroid.png");
-    textures[Texture::TEXTURE_TYPE::TEX_PLAYER] = LoadTexture("../Assets/spaceship.png");
+	GLuint asteroidTexture = LoadTexture("../Assets/asteroid.png");
+	GLuint playerTexture = LoadTexture("../Assets/spaceship.png");
+
+	if (asteroidTexture == 0) asteroidTexture = LoadTexture("../../../Assets/asteroid.png");
+	if (playerTexture == 0) playerTexture = LoadTexture("../../../Assets/spaceship.png");
+
+    textures[Texture::TEXTURE_TYPE::TEX_ASTEROID] = asteroidTexture;
+    textures[Texture::TEXTURE_TYPE::TEX_PLAYER] = playerTexture;
 }
 
 void GraphicsEngine::Render(std::vector<std::unique_ptr<GameObject>>& gameObjects) {
@@ -155,5 +161,6 @@ GLuint GraphicsEngine::LoadTexture(const std::string& filePath)
     stbi_image_free(data);
     glBindTexture(GL_TEXTURE_2D, 0);
 
+	std::cout << "Loaded texture: " << filePath << std::endl;
     return textureID;
 }
