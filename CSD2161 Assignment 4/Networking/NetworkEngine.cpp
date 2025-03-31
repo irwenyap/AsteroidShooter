@@ -271,8 +271,13 @@ void NetworkEngine::SendEventToServer(std::unique_ptr<GameEvent> eventt) {
 		packet.insert(packet.end(), eventData.begin(), eventData.end());
 		break;
 	}
-
-	} // end switch
+	case EventType::Collision: {
+		auto collisionEvent = static_cast<CollisionEvent*>(eventt.get());
+		std::vector<char> eventData = collisionEvent->Serialize();
+		packet.insert(packet.end(), eventData.begin(), eventData.end());
+		break;
+	} 
+	}// end switch
 
 
 	if (packet.size() > 2) { // Ensure we actually added event data
@@ -486,6 +491,17 @@ void NetworkEngine::HandleAckEvent(const std::vector<char>& data, const sockaddr
 			EventQueue::GetInstance().Push(std::move(it));
 			break;
 		}
+		case EventType::Collision: {
+			NetworkID a, b;
+			std::memcpy(&a, &eventData[offset], sizeof(NetworkID)); offset += sizeof(NetworkID);
+			std::memcpy(&b, &eventData[offset], sizeof(NetworkID)); offset += sizeof(NetworkID);
+			a = ntohl(a);
+			b = ntohl(b);
+			auto it = std::make_unique<CollisionEvent>(a, b);
+			it->id = newNetworkID;
+			EventQueue::GetInstance().Push(std::move(it));
+			break;
+		}
 		default: {
 			std::cerr << "[Client] Cannot process unknown committed event type: " << static_cast<int>(eventType) << std::endl;
 			break;
@@ -610,6 +626,19 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 	}
 	case EventType::SpawnAsteroid: {
 		EventQueue::GetInstance().Push(std::make_unique<SpawnAsteroidEvent>(networkID, eventData));	
+		break;
+	}
+	case EventType::Collision: {
+ 		int offset = 1;
+		NetworkID idA,idB;
+		std::memcpy(&idA, &eventData[offset], sizeof(idA));
+		std::memcpy(&idB, &eventData[offset + sizeof(idA)], sizeof(idB));
+		idA = ntohl(idA);
+		idB = ntohl(idB);
+
+		auto it = std::make_unique<CollisionEvent>(idA, idB);
+		it->id = networkID;
+		EventQueue::GetInstance().Push(std::move(it));
 		break;
 	}
 							  // Add cases for other lockstepped events here...
