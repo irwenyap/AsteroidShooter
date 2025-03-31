@@ -18,8 +18,8 @@
 #define WINSOCK_SUBVERSION  2
 #define MAX_STR_LEN         1000
 
-extern Tick simulationTick;
-extern Tick localTick;
+//extern Tick simulationTick;
+//extern Tick localTick;
 
 // HACK: Temporary global scene pointer for state sync.
 extern AsteroidScene * g_AsteroidScene;

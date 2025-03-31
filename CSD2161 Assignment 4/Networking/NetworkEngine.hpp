@@ -67,6 +67,9 @@ public:
 	bool isClient = false;
 	ClientManager clientManager;
 	SocketManager socketManager;
+
+	Tick simulationTick = 0; // global tick tracker
+	Tick localTick = simulationTick; // for client
 private:
 	NetworkEngine() = default;
 	~NetworkEngine() = default;

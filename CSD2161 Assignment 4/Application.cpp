@@ -81,9 +81,9 @@ void FramebufferSizeCallback(GLFWwindow* window, int width, int height) {
 	//std::cout << "Window resized: " << width << "x" << height << std::endl;
 }
 
-using Tick = uint32_t;
-Tick simulationTick = 0; // global tick tracker
-Tick localTick = simulationTick; // for client
+//using Tick = uint32_t;
+//Tick simulationTick = 0; // global tick tracker
+//Tick localTick = simulationTick; // for client
 
 void Application::Run() {
 	Timer timer;
@@ -146,8 +146,8 @@ void Application::Run() {
 			//}
 			as.FixedUpdate(timer.GetFixedDT());
 
-			simulationTick++;
-			localTick++;
+			NetworkEngine::GetInstance().simulationTick++;
+			NetworkEngine::GetInstance().localTick++;
 		}
 		as.Render();
 		as.ProcessEvents();
@@ -158,15 +158,6 @@ void Application::Run() {
 
 
 		m_context->SwapBuffers();
-
-		//std::cout << timer.GetFPS() << std::endl;
-
-		//auto end = std::chrono::high_resolution_clock::now();
-		//std::chrono::duration<float, std::milli> elapsed = end - start;
-
-		//int sleepTime = FRAME_DURATION - static_cast<int>(elapsed.count());
-		//if (sleepTime > 0)
-		//	std::this_thread::sleep_for(std::chrono::milliseconds(sleepTime));
 	}
 
 	as.Exit();
