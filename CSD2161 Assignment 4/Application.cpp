@@ -65,7 +65,7 @@ void ShowNetworkUI() {
 
 		if (ne.isHosting) {
 			if (ImGui::Button("Start Game")) {
-				EventQueue::GetInstance().Push(std::make_unique<StartGameEvent>());
+				EventQueue::GetInstance().Push(std::make_unique<RequestStartGameEvent>());
 			}
 		}
 	}

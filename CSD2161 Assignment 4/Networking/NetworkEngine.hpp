@@ -54,6 +54,7 @@ public:
 	void SendToClient(const Client& client, const std::vector<char>& packet); // Specific client send
 	void SendToOtherClients(const sockaddr_in& reqClient, std::vector<char> packet);
 	void HandleIncomingConnection(const std::vector<char>& data, const sockaddr_in& clientAddr);
+	void HandleClientEvent(const std::vector<char>& data, const sockaddr_in& clientAddr = {}); //tmp hack for server to send to itself
 	//void SendTickSync(Tick&);
 	void ProcessTickSync(Tick&, Tick&);
 	//void SendPacket(std::vector<char>);
@@ -77,7 +78,7 @@ private:
 	EventID nextEventID = 0;
 	TimePoint lastHeartbeatSentTime; // Client tracks when it last sent a heartbeat
 
-	void HandleClientEvent(const std::vector<char>& data, const sockaddr_in& clientAddr);
+	
 	void HandleAckEvent(const std::vector<char>&data, const sockaddr_in & clientAddr);
 	void HandleHeartbeat(const sockaddr_in& clientAddr); // Host handles heartbeat
 	void HandleBroadcastEvent(const std::vector<char>&data); // Client side

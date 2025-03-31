@@ -58,7 +58,7 @@ void AsteroidScene::Update(double dt) {
 
 			std::vector<char> packet;
 			packet.push_back(NetworkEngine::CMDID::GAME_EVENT);
-			packet.push_back(static_cast<char>(1));
+			//packet.push_back(static_cast<char>(1));
 			packet.push_back(static_cast<char>(EventType::SpawnAsteroid));
 
 			NetworkID netNID = htonl(asteroid->networkID);
@@ -97,7 +97,9 @@ void AsteroidScene::Update(double dt) {
 			gameObjects.push_back(std::move(asteroid));
 			networkedObjects[rawAsteroid->networkID] = rawAsteroid;
 
-			NetworkEngine::GetInstance().SendToAllClients(packet);
+			NetworkEngine::GetInstance().HandleClientEvent(packet);
+
+			//NetworkEngine::GetInstance().SendToAllClients(packet);
 			std::cout << "Server asteroid spawned at: " << rawAsteroid->position.x << ", " << rawAsteroid->position.y << "\n";
 			asteroidSpawnTimer = 0.0;
 		}
@@ -168,9 +170,10 @@ void AsteroidScene::ProcessEvents() {
 
 			break;
 		}
-		case EventType::StartGame: {
+		case EventType::RequestStartGame: {
 			std::vector<char> packet;
-			packet.push_back(NetworkEngine::CMDID::GAME_EVENT);
+			packet.push_back(static_cast<char>(NetworkEngine::CMDID::GAME_EVENT));
+			packet.push_back(static_cast<char>(EventType::StartGame));
 			// push number of events;
 			packet.push_back(static_cast<uint8_t>(NetworkEngine::GetInstance().GetNumConnectedClients() + 1));
 
@@ -219,8 +222,9 @@ void AsteroidScene::ProcessEvents() {
 			int i = 1;
 			for (auto& client : NetworkEngine::GetInstance().clientManager.GetClients()) {
 				std::vector<char> clientPacket(packet);
-				clientPacket[i++ * 5 + 2] = static_cast<char>(EventType::SpawnPlayer);
-				NetworkEngine::GetInstance().socketManager.SendToClient(client.address, clientPacket);
+				clientPacket[i++ * 5 + 3] = static_cast<char>(EventType::SpawnPlayer);
+				NetworkEngine::GetInstance().HandleClientEvent(clientPacket, client.address);
+				//NetworkEngine::GetInstance().SendToClient(client, clientPacket);
 			}
 			gameStarted = true;
 			break;

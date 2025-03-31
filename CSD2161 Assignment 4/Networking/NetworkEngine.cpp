@@ -107,29 +107,6 @@ void NetworkEngine::Update(double) {
 				EventQueue::GetInstance().Push(std::make_unique<PlayerUpdate>(data.data(), data.size()));
 				break;
 			}
-			case GAME_EVENT: {
-				int offset = 2;
-				for (uint8_t i = 0; i < data[1]; ++i) {
-					uint8_t eventType = data[offset++];
-					NetworkID networkID;
-					std::memcpy(&networkID, &data[offset], sizeof(networkID));
-					networkID = ntohl(networkID);
-					offset += sizeof(networkID);
-
-					switch (eventType) {
-					case static_cast<uint8_t>(EventType::SpawnPlayer):
-						EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
-						break;
-					case static_cast<uint8_t>(EventType::PlayerJoined):
-						EventQueue::GetInstance().Push(std::make_unique<PlayerJoinedEvent>(networkID));
-						break;
-					case static_cast<uint8_t>(EventType::SpawnAsteroid):
-						EventQueue::GetInstance().Push(std::make_unique<SpawnAsteroidEvent>(networkID, data));
-						break;
-					}
-				}
-				break;
-			}
 			case BROADCAST_EVENT: // Host broadcasting an event for lockstep
 				HandleBroadcastEvent(data);
 				break;
@@ -537,6 +514,30 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 		it->id = networkID;
 
 		EventQueue::GetInstance().Push(std::move(it));
+		break;
+	}
+	case EventType::StartGame: {
+		int offset = 2;
+		for (uint8_t i = 0; i < eventData[1]; ++i) {
+			uint8_t eventType = eventData[offset++];
+			NetworkID networkID;
+			std::memcpy(&networkID, &eventData[offset], sizeof(networkID));
+			networkID = ntohl(networkID);
+			offset += sizeof(networkID);
+
+			switch (eventType) {
+			case static_cast<uint8_t>(EventType::SpawnPlayer):
+				EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
+				break;
+			case static_cast<uint8_t>(EventType::PlayerJoined):
+				EventQueue::GetInstance().Push(std::make_unique<PlayerJoinedEvent>(networkID));
+				break;
+			}
+		}
+		break;
+	}
+	case EventType::SpawnAsteroid: {
+		EventQueue::GetInstance().Push(std::make_unique<SpawnAsteroidEvent>(networkID, eventData));	
 		break;
 	}
 							  // Add cases for other lockstepped events here...
