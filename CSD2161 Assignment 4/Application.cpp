@@ -65,8 +65,10 @@ void ShowNetworkUI() {
 		ImGui::Text(portText.c_str());
 
 		if (ne.isHosting) {
-			if (ImGui::Button("Start Game")) {
+			static bool once = true;
+			if (once && ImGui::Button("Start Game")) {
 				EventQueue::GetInstance().Push(std::make_unique<RequestStartGameEvent>());
+				once = false;
 			}
 		}
 	}
