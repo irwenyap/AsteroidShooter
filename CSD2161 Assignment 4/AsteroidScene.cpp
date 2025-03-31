@@ -222,7 +222,7 @@ void AsteroidScene::ProcessEvents() {
 			for (auto& client : NetworkEngine::GetInstance().clientManager.GetClients()) {
 				std::vector<char> clientPacket(packet);
 				clientPacket[i++ * 5 + 3] = static_cast<char>(EventType::SpawnPlayer);
-				NetworkEngine::GetInstance().HandleClientEvent(clientPacket, client.address);
+				NetworkEngine::GetInstance().HandleClientEvent(clientPacket);
 				//NetworkEngine::GetInstance().SendToClient(client, clientPacket);
 			}
 			gameStarted = true;
