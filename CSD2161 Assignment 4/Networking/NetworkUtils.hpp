@@ -1,6 +1,7 @@
 
 #include <vector>
 #include <glm/vec3.hpp>
+#include <glm/vec2.hpp>
 #include <WinSock2.h>
 
 namespace NetworkUtils {
@@ -34,6 +35,11 @@ namespace NetworkUtils {
         WriteToPacket(packet, FloatToNetwork(vec.z), DATA_TYPE::DT_LONG);
     }
 
+    inline void WriteVec2(std::vector<char>& packet, const glm::vec2 vec) {
+        WriteToPacket(packet, FloatToNetwork(vec.x), DATA_TYPE::DT_LONG);
+        WriteToPacket(packet, FloatToNetwork(vec.y), DATA_TYPE::DT_LONG);
+    }
+
     // READING
     template <typename T>
     void ReadFromPacket(const char* packet, size_t offset, T& outData, DATA_TYPE type) {
@@ -62,5 +68,14 @@ namespace NetworkUtils {
 
         NetworkUtils::ReadFromPacket(packet, offset + 8, tmp, DATA_TYPE::DT_LONG);
         vec.z = NetworkToFloat(tmp);
+    }
+
+    inline void ReadVec2(const char* packet, size_t offset, glm::vec3& vec) {
+        uint32_t tmp;
+        NetworkUtils::ReadFromPacket(packet, offset, tmp, DATA_TYPE::DT_LONG);
+        vec.x = NetworkToFloat(tmp);
+
+        NetworkUtils::ReadFromPacket(packet, offset + 4, tmp, DATA_TYPE::DT_LONG);
+        vec.y = NetworkToFloat(tmp);
     }
 }

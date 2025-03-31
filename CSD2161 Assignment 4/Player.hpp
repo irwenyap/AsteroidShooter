@@ -7,9 +7,13 @@
 class Player : public GameObject, public NetworkObject {
 	glm::vec3 prevPos;
 	float prevRot;
+
 	glm::vec3 targetPos;
 	float targetRot = 0.f;
+
+	glm::vec3 lastReceivedVelocity = glm::vec3(0.f);
 	glm::vec3 velocity = glm::vec3(0.f);
+
 	float rotationSpeed = glm::radians(180.f);
 	float thrust = 10.f;
 	float drag = 0.98f;
