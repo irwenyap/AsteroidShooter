@@ -138,6 +138,17 @@ struct CollisionEvent : public GameEvent {
     }
     NetworkID idA;
     NetworkID idB;
+
+    // Simple serialization for FireBulletEvent
+    std::vector<char> Serialize() const {
+        std::vector<char> data;
+        
+        uint32_t netA = htonl(idA);
+        NetworkUtils::WriteToPacket(data, netA, NetworkUtils::DATA_TYPE::DT_LONG);
+        uint32_t netB = htonl(idB);
+        NetworkUtils::WriteToPacket(data, netB, NetworkUtils::DATA_TYPE::DT_LONG);
+        return data;
+    }
 };
 
 struct PlayerUpdate : public GameEvent {
