@@ -33,7 +33,7 @@ enum class EventType {
 
 struct GameEvent {
     EventType type;
-    EventID id;
+    NetworkID id;
     virtual ~GameEvent() = default;
 };
 
