@@ -67,7 +67,7 @@ void NetworkEngine::Update(double) {
 				SendToOtherClients(sender, data); // Still broadcast state updates immediately
 				break;
 			case GAME_EVENT: // Client submitting an action event for lockstep
-				HandleClientEvent(data, sender);
+				HandleClientEvent(data);
 				break;
 			case ACK_EVENT: // Client acknowledging receipt of a broadcast event
 				HandleAckEvent(data, sender);
@@ -287,14 +287,15 @@ void NetworkEngine::SendEventToServer(std::unique_ptr<GameEvent> eventt) {
 	packet.push_back(static_cast<char>(eventt->type)); // Add the event type
 
 	// Serialize the specific event data
-	if (eventt->type == EventType::FireBullet) {
-		// Assuming FireBulletEvent has a Serialize method or we do it here
+	switch (eventt->type) {
+	case EventType::FireBullet: {
 		auto fireEvent = static_cast<FireBulletEvent*>(eventt.get());
 		std::vector<char> eventData = fireEvent->Serialize();
 		packet.insert(packet.end(), eventData.begin(), eventData.end());
+		break;
 	}
-	// Add other event types here...
-	// else if (event->type == ...) { ... }
+
+	} // end switch
 
 
 	if (packet.size() > 2) { // Ensure we actually added event data
@@ -305,6 +306,42 @@ void NetworkEngine::SendEventToServer(std::unique_ptr<GameEvent> eventt) {
 	}
 }
 
+void NetworkEngine::ServerBroadcastEvent(std::unique_ptr<GameEvent> event) 
+{
+	if (!isHosting) return;
+
+	std::vector<char> data;
+	switch (event->type) {
+	case EventType::FireBullet: {
+		auto fireEvent = static_cast<FireBulletEvent*>(event.get());
+		data.push_back(static_cast<char>(EventType::FireBullet));
+		std::vector<char> eventData = fireEvent->Serialize();
+		data.insert(data.end(), eventData.begin(), eventData.end());
+		break;
+	}
+	} // end switch
+
+	EventID currentEventID = nextEventID++;
+	EventType eventType = event->type;
+
+	PendingEventInfo info;
+	info.eventData = std::move(data);
+	info.broadcastTime = std::chrono::steady_clock::now();
+	pendingAcks[currentEventID] = std::move(info);
+	
+	
+	// Prepare broadcast packet
+	std::vector<char> broadcastPacket;
+	broadcastPacket.push_back(CMDID::BROADCAST_EVENT); // Mark as broadcast event
+	EventID netEventID = htonl(currentEventID);
+	broadcastPacket.insert(broadcastPacket.end(), reinterpret_cast<char*>(&netEventID), reinterpret_cast<char*>(&netEventID) + sizeof(netEventID));
+	// Append the original event data (EventType + SpecificData)
+	broadcastPacket.insert(broadcastPacket.end(), 
+		pendingAcks[currentEventID].eventData.begin(), pendingAcks[currentEventID].eventData.end());
+
+	std::cout << "[Host] Broadcasting Event ID: " << currentEventID << std::endl;
+	SendToAllClients(broadcastPacket); // Broadcast to everyone
+}
 
 void NetworkEngine::SendToAllClients(std::vector<char> packet)
 {
@@ -348,7 +385,7 @@ void NetworkEngine::HandleIncomingConnection(const std::vector<char>& data, cons
 	}
 }
 
-void NetworkEngine::HandleClientEvent(const std::vector<char>& data, const sockaddr_in& clientAddr) {
+void NetworkEngine::HandleClientEvent(const std::vector<char>& data) {
 	if (data.size() < 2) return; // Need at least CMDID and EventType
 
 	// Optional: Verify client is known
@@ -361,7 +398,7 @@ void NetworkEngine::HandleClientEvent(const std::vector<char>& data, const socka
 	std::cout << "[Host] Received GAME_EVENT (Type: " << static_cast<int>(eventType) << "), Assigning ID: " << currentEventID << std::endl;
 
 	// Store event data for ACK tracking (skip CMDID)
-	PendingEventInfo info;
+	PendingEventInfo info;	
 	info.eventData.assign(data.begin() + 1, data.end()); // Store EventType + SpecificData
 	info.broadcastTime = std::chrono::steady_clock::now(); // Record broadcast time
 	pendingAcks[currentEventID] = std::move(info);

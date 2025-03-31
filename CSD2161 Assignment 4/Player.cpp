@@ -52,7 +52,7 @@ void Player::Update(double dt)
 				NetworkEngine::GetInstance().SendEventToServer(std::move(fireEvent));
 			}
 			else if (NetworkEngine::GetInstance().isHosting) {
-				
+ 				NetworkEngine::GetInstance().ServerBroadcastEvent(std::move(fireEvent));
 			}
 
             

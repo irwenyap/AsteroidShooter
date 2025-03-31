@@ -67,7 +67,10 @@ public:
 	bool isClient = false;
 	ClientManager clientManager;
 	SocketManager socketManager;
-private:
+
+	void ServerBroadcastEvent(std::unique_ptr<GameEvent> event);
+
+public:
 	NetworkEngine() = default;
 	~NetworkEngine() = default;
 
@@ -77,7 +80,7 @@ private:
 	EventID nextEventID = 0;
 	TimePoint lastHeartbeatSentTime; // Client tracks when it last sent a heartbeat
 
-	void HandleClientEvent(const std::vector<char>& data, const sockaddr_in& clientAddr);
+	void HandleClientEvent(const std::vector<char>& data);
 	void HandleAckEvent(const std::vector<char>&data, const sockaddr_in & clientAddr);
 	void HandleHeartbeat(const sockaddr_in& clientAddr); // Host handles heartbeat
 	void HandleBroadcastEvent(const std::vector<char>&data); // Client side
