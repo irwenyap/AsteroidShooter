@@ -1,7 +1,7 @@
 #include "PlayerBullet.hpp"
 
-PlayerBullet::PlayerBullet(glm::vec3 pos, glm::vec3 dir)
-    : dir(dir), speed(50.f)
+PlayerBullet::PlayerBullet(glm::vec3 pos, glm::vec3 dir, uint32_t ownerID)
+    : dir(dir), speed(50.f), playerID(ownerID)
 {
     position = pos;
     rotation = static_cast<float>(atan2(dir.y, dir.x));
