@@ -81,8 +81,10 @@ void ShowNetworkUI() {
 		}
 
 		if (ne.isHosting) {
-			if (ImGui::Button("Start Game")) {
+			static bool onceOnStart = true;
+			if (onceOnStart && ImGui::Button("Start Game")) {
 				EventQueue::GetInstance().Push(std::make_unique<RequestStartGameEvent>());
+				onceOnStart = false;
 			}
 		}
 	}
