@@ -16,6 +16,7 @@ class Player : public GameObject, public NetworkObject {
 public:
 	Player();
 	void Update(double) override;
+	void FixedUpdate(double) override;
 
 	std::vector<char> Serialize() override;
 	void Deserialize(const char*) override;

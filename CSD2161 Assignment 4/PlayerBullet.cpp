@@ -13,6 +13,10 @@ void PlayerBullet::Update(double dt) {
 	position += dir * speed * static_cast<float>(dt);
 }
 
+void PlayerBullet::FixedUpdate(double)
+{
+}
+
 std::vector<char> PlayerBullet::Serialize()
 {
     std::vector<char> ret;

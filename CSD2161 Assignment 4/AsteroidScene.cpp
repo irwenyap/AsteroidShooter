@@ -27,9 +27,9 @@ void AsteroidScene::Initialize() {
 }
 
 void AsteroidScene::Update(double dt) {
-	//for (auto& go : gameObjects) {
-	//	go->Update(dt);
-	//}
+	for (auto& go : gameObjects) {
+		go->Update(dt);
+	}
 	if (gameStarted && NetworkEngine::GetInstance().isHosting) {
 		asteroidSpawnTimer += dt;
 		//std::cout << asteroidSpawnTimer << std::endl;
@@ -112,7 +112,7 @@ void AsteroidScene::Update(double dt) {
 
 void AsteroidScene::FixedUpdate(double fixedDT) {
 	for (auto& go : gameObjects) {
-		go->Update(fixedDT);
+		go->FixedUpdate(fixedDT);
 	}
 
 	// Setting only host to detect for collision
@@ -167,10 +167,6 @@ void AsteroidScene::ProcessEvents() {
 			NetworkObject* rawBullet = bullet.get();
 			gameObjects.push_back(std::move(bullet));
 			networkedObjects[rawBullet->networkID] = rawBullet;
-
-
-			// network engine need to broadcast all these events
-
 
 			break;
 		}
@@ -227,7 +223,7 @@ void AsteroidScene::ProcessEvents() {
 			for (auto& client : NetworkEngine::GetInstance().clientManager.GetClients()) {
 				std::vector<char> clientPacket(packet);
 				clientPacket[i++ * 5 + 3] = static_cast<char>(EventType::SpawnPlayer);
-				NetworkEngine::GetInstance().HandleClientEvent(clientPacket, client.address);
+				NetworkEngine::GetInstance().HandleClientEvent(clientPacket);
 				//NetworkEngine::GetInstance().SendToClient(client, clientPacket);
 			}
 			gameStarted = true;

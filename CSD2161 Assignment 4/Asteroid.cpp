@@ -10,6 +10,10 @@ void Asteroid::Update(double dt)
 	position += velocity * static_cast<float>(dt);
 }
 
+void Asteroid::FixedUpdate(double)
+{
+}
+
 std::vector<char> Asteroid::Serialize()
 {
 	return std::vector<char>();
