@@ -35,7 +35,7 @@ void Player::Update(double dt)
             // EventQueue::GetInstance().Push(std::make_unique<FireBulletEvent>(position, rotation, networkID)); // OLD WAY
         }
 
-        if (glm::length(position - prevPos) > 1.f || std::abs(rotation - prevRot) > 0.05f) {
+        if (glm::length(position - prevPos) > 1.f || std::abs(rotation - prevRot) > 0.1f) {
             if (NetworkEngine::GetInstance().isClient) {
                 NetworkEngine::GetInstance().socketManager.SendToHost(Serialize());
                 prevPos = position;
@@ -70,29 +70,22 @@ void Player::FixedUpdate(double fixedDt) {
 
         position += velocity * static_cast<float>(fixedDt);
     } else {
-        //float interpSpeed = 5.0f; // higher = faster interpolation
-        //position = glm::mix(position, targetPos, interpSpeed * static_cast<float>(dt));
-
-        //if (std::abs(rotation - targetRot) > 0.01f)
-        //    rotation = LerpAngle(rotation, targetRot, interpSpeed * static_cast<float>(dt));
-
         float interpolationSpeed = 2.0f;
 
         uint32_t currentTick = NetworkEngine::GetInstance().localTick;
         int tickDelta = static_cast<int>(currentTick) - static_cast<int>(lastReceivedTick);
-        tickDelta = glm::clamp(tickDelta, 0, 15); // Cap at ~250ms
+        tickDelta = glm::clamp(tickDelta, 0, 15); // clamp to prevent over-extrapolation
 
         float extrapolationTime = static_cast<float>(tickDelta) / 60.0f;
-        //float extrapolationTime = static_cast<float>(dt);
 
-        // Predict where the player should be based on last known velocity
+        // predict where the player should be based on last known velocity
         glm::vec3 extrapolatedTarget = targetPos + lastReceivedVelocity * extrapolationTime;
 
-        // Smoothly move towards extrapolated target
-        position = glm::mix(position, extrapolatedTarget, interpolationSpeed * extrapolationTime);
+        // smoothly move towards extrapolated target
+        position = glm::mix(position, extrapolatedTarget, interpolationSpeed * static_cast<float>(fixedDt));
 
         if (std::abs(rotation - targetRot) > 0.01f)
-            rotation = LerpAngle(rotation, targetRot, interpolationSpeed * extrapolationTime);
+            rotation = LerpAngle(rotation, targetRot, interpolationSpeed * static_cast<float>(fixedDt));
     }
 }
 
