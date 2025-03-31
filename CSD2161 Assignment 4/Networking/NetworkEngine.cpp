@@ -46,6 +46,10 @@ void NetworkEngine::Update(double) {
 
 	if (isHosting) {
 
+		if (simulationTick % 120 == 0) { // Every 120 ticks (2 second) send sync.
+			SendTickSync();
+		}
+
 		// Resend packets that have timed out
 		CheckAckTimeouts();
 
@@ -346,6 +350,14 @@ void NetworkEngine::HandleIncomingConnection(const std::vector<char>& data, cons
 
 		}
 	}
+}
+
+void NetworkEngine::SendTickSync() {
+	std::vector<char> packet;
+	packet.reserve(5);
+	packet.push_back(CMDID::TICK_SYNC);
+	NetworkUtils::WriteToPacket(packet, simulationTick, NetworkUtils::DATA_TYPE::DT_LONG);
+	SendToAllClients(packet);
 }
 
 void NetworkEngine::HandleClientEvent(const std::vector<char>& data, const sockaddr_in& clientAddr) {

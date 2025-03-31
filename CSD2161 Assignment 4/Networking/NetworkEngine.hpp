@@ -54,7 +54,7 @@ public:
 	void SendToClient(const Client& client, const std::vector<char>& packet); // Specific client send
 	void SendToOtherClients(const sockaddr_in& reqClient, std::vector<char> packet);
 	void HandleIncomingConnection(const std::vector<char>& data, const sockaddr_in& clientAddr);
-	//void SendTickSync(Tick&);
+	void SendTickSync();
 	void ProcessTickSync(Tick&, Tick&);
 	//void SendPacket(std::vector<char>);
 	size_t GetNumConnectedClients() const;
