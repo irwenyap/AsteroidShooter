@@ -486,7 +486,7 @@ void NetworkEngine::HandleAckEvent(const std::vector<char>& data, const sockaddr
 			ownerId = tempOwner;
 
 			auto it = std::make_unique<FireBulletEvent>(pos, rot, ownerId);
-			it->id = newNetworkID;
+			it->id = ntohl(newNetworkID);
 
 			EventQueue::GetInstance().Push(std::move(it));
 			break;
@@ -498,7 +498,7 @@ void NetworkEngine::HandleAckEvent(const std::vector<char>& data, const sockaddr
 			a = ntohl(a);
 			b = ntohl(b);
 			auto it = std::make_unique<CollisionEvent>(a, b);
-			it->id = newNetworkID;
+			it->id = ntohl(newNetworkID);
 			EventQueue::GetInstance().Push(std::move(it));
 			break;
 		}
@@ -625,6 +625,10 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 		break;
 	}
 	case EventType::SpawnAsteroid: {
+
+		std::memcpy(&networkID, &eventData[1], sizeof(networkID));
+		networkID = ntohl(networkID);
+
 		EventQueue::GetInstance().Push(std::make_unique<SpawnAsteroidEvent>(networkID, eventData));	
 		break;
 	}

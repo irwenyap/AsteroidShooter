@@ -104,7 +104,7 @@ void AsteroidScene::Update(double dt) {
 			NetworkEngine::GetInstance().HandleClientEvent(packet);
 
 			//NetworkEngine::GetInstance().SendToAllClients(packet);
-			std::cout << "Server asteroid spawned at: " << rawAsteroid->position.x << ", " << rawAsteroid->position.y << "\n";
+			std::cout << "Server asteroid spawned at: " << rawAsteroid->position.x << ", " << rawAsteroid->position.y << "with id: " << rawAsteroid->networkID << "\n";
 			asteroidSpawnTimer = 0.0;
 		}
 	}
@@ -311,7 +311,7 @@ void AsteroidScene::ProcessEvents() {
 			Asteroid* rawAsteroid = asteroid.get();
 			gameObjects.push_back(std::move(asteroid));
 			networkedObjects[rawAsteroid->networkID] = rawAsteroid;
-			std::cout << "Client asteroid spawned at: " << spawnEvent->initialPosition.x << ", " << spawnEvent->initialPosition.y << "\n";
+			std::cout << "Client asteroid spawned at: " << spawnEvent->initialPosition.x << ", " << spawnEvent->initialPosition.y << "with id :"<< rawAsteroid->networkID <<"\n";
 			break;
 		}
 		case EventType::Collision: {
