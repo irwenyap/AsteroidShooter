@@ -338,6 +338,25 @@ void NetworkEngine::SendToClient(const Client & client, const std::vector<char>&
 	}
 }
 
+void NetworkEngine::SendtoClientSameEvent(const Client& client, EventID eid, const std::vector<char>& data) {
+	// Store event data for ACK tracking (skip CMDID)
+	PendingEventInfo info;
+	info.eventData.assign(data.begin() + 1, data.end()); // Store EventType + SpecificData
+	info.broadcastTime = std::chrono::steady_clock::now(); // Record broadcast time
+	pendingAcks[eid] = std::move(info);
+
+	// Prepare broadcast packet
+	std::vector<char> broadcastPacket;
+	broadcastPacket.push_back(CMDID::BROADCAST_EVENT);
+	EventID netEventID = htonl(eid);
+	broadcastPacket.insert(broadcastPacket.end(), reinterpret_cast<char*>(&netEventID), reinterpret_cast<char*>(&netEventID) + sizeof(netEventID));
+	// Append the original event data (EventType + SpecificData)
+	broadcastPacket.insert(broadcastPacket.end(), data.begin() + 1, data.end());
+
+	std::cout << "[Host] Broadcasting Event ID: " << eid << std::endl;
+	SendToClient(client, broadcastPacket); // Broadcast to everyone
+}
+
 void NetworkEngine::SendToOtherClients(const sockaddr_in& reqClient, std::vector<char> packet)
 {
 	for (auto& client : clientManager.GetClients()) {
@@ -471,7 +490,7 @@ void NetworkEngine::HandleAckEvent(const std::vector<char>& data, const sockaddr
 		switch (eventType) {
 		case EventType::FireBullet: {
 			if (eventData.size() < offset + (sizeof(float) * 3) + sizeof(float) + sizeof(uint32_t)) { // Basic size check for vec3 + float + uint32
-				std::cerr << "[Client] Insufficient data for FireBulletEvent ID: " << eventID << std::endl;
+				std::cerr << "[Host] Insufficient data for FireBulletEvent ID: " << eventID << std::endl;
 				break;
 			}
 			glm::vec3 pos;
@@ -502,8 +521,14 @@ void NetworkEngine::HandleAckEvent(const std::vector<char>& data, const sockaddr
 			EventQueue::GetInstance().Push(std::move(it));
 			break;
 		}
+		case EventType::StartGame: {
+			
+			
+			
+			break;
+		}
 		default: {
-			std::cerr << "[Client] Cannot process unknown committed event type: " << static_cast<int>(eventType) << std::endl;
+			std::cerr << "[Host] Cannot process unknown committed event type: " << static_cast<int>(eventType) << std::endl;
 			break;
 		}
 			
