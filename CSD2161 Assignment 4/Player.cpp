@@ -46,8 +46,15 @@ void Player::Update(double dt)
 
         if (input.GetKeyDown(GLFW_KEY_SPACE)) {
             // Don't push locally, send to server for lockstep
+
             auto fireEvent = std::make_unique<FireBulletEvent>(position, rotation, networkID);
-            NetworkEngine::GetInstance().SendEventToServer(std::move(fireEvent));
+			if (NetworkEngine::GetInstance().isClient) {
+				NetworkEngine::GetInstance().SendEventToServer(std::move(fireEvent));
+			}
+			else if (NetworkEngine::GetInstance().isHosting) {
+				
+			}
+
             
             // EventQueue::GetInstance().Push(std::make_unique<FireBulletEvent>(position, rotation, networkID)); // OLD WAY
         }

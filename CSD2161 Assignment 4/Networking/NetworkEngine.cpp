@@ -46,6 +46,9 @@ void NetworkEngine::Update(double) {
 
 	if (isHosting) {
 
+		// Resend packets that have timed out
+		CheckAckTimeouts();
+
 		// Check for client timeouts and timed-out events before processing new packets
 		CheckTimeoutsAndHeartbeats();
 
@@ -102,29 +105,6 @@ void NetworkEngine::Update(double) {
 			}
 			case GAME_DATA: {
 				EventQueue::GetInstance().Push(std::make_unique<PlayerUpdate>(data.data(), data.size()));
-				break;
-			}
-			case GAME_EVENT: {
-				int offset = 2;
-				for (uint8_t i = 0; i < data[1]; ++i) {
-					uint8_t eventType = data[offset++];
-					NetworkID networkID;
-					std::memcpy(&networkID, &data[offset], sizeof(networkID));
-					networkID = ntohl(networkID);
-					offset += sizeof(networkID);
-
-					switch (eventType) {
-					case static_cast<uint8_t>(EventType::SpawnPlayer):
-						EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
-						break;
-					case static_cast<uint8_t>(EventType::PlayerJoined):
-						EventQueue::GetInstance().Push(std::make_unique<PlayerJoinedEvent>(networkID));
-						break;
-					case static_cast<uint8_t>(EventType::SpawnAsteroid):
-						EventQueue::GetInstance().Push(std::make_unique<SpawnAsteroidEvent>(networkID, data));
-						break;
-					}
-				}
 				break;
 			}
 			case BROADCAST_EVENT: // Host broadcasting an event for lockstep
@@ -422,10 +402,11 @@ void NetworkEngine::HandleAckEvent(const std::vector<char>& data, const sockaddr
 	auto insertResult = pendingInfo.acksReceived.insert(senderClientID);
 
 	if (insertResult.second) { // Check if insert actually happened (avoid double counting)
-		std::cout << "[Host] Received ACK for Event ID: " << eventID << " from Client " << senderClientID
-			<< " (" << pendingInfo.acksReceived.size() << "/" << clientManager.GetClients().size() << ")" << std::endl;
+		std::cout 
+			<< "[Host] Received ACK for Event ID: " << eventID << " from Client " << senderClientID
+			<< " (" << pendingInfo.acksReceived.size() << "/" << clientManager.GetClients().size() << ")" 
+			<< std::endl;
 	}
-
 
 	// Check if all connected clients have ACKed
 	if (pendingInfo.acksReceived.size() >= GetNumConnectedClients()) {
@@ -456,12 +437,15 @@ void NetworkEngine::HandleBroadcastEvent(const std::vector<char>& data) {
 
 	EventType eventType = static_cast<EventType>(data[1 + sizeof(EventID)]);
 
-	std::cout << "[Client] Received BROADCAST_EVENT (Type: " << static_cast<int>(eventType) << ") ID: " << eventID << std::endl;
-
-
-	// Store the event data (excluding CMDID and EventID) for later processing
-	// Start copying after the EventID
-	pendingClientEvents[eventID].assign(data.begin() + 1 + sizeof(EventID), data.end());
+	if (pendingClientEvents.find(eventID) != pendingClientEvents.end()) {
+		std::cerr << "[Client] Received duplicate BROADCAST_EVENT for ID: " << eventID << std::endl;
+	}
+	else {
+		std::cout << "[Client] Received BROADCAST_EVENT (Type: " << static_cast<int>(eventType) << ") ID: " << eventID << std::endl;
+		// Store the event data (excluding CMDID and EventID) for later processing
+		// Start copying after the EventID
+		pendingClientEvents[eventID].assign(data.begin() + 1 + sizeof(EventID), data.end());
+	}
 
 	// Send ACK back to host
 	std::vector<char> ackPacket;
@@ -530,6 +514,30 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 		it->id = networkID;
 
 		EventQueue::GetInstance().Push(std::move(it));
+		break;
+	}
+	case EventType::StartGame: {
+		int offset = 2;
+		for (uint8_t i = 0; i < eventData[1]; ++i) {
+			uint8_t eventType = eventData[offset++];
+			NetworkID networkID;
+			std::memcpy(&networkID, &eventData[offset], sizeof(networkID));
+			networkID = ntohl(networkID);
+			offset += sizeof(networkID);
+
+			switch (eventType) {
+			case static_cast<uint8_t>(EventType::SpawnPlayer):
+				EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
+				break;
+			case static_cast<uint8_t>(EventType::PlayerJoined):
+				EventQueue::GetInstance().Push(std::make_unique<PlayerJoinedEvent>(networkID));
+				break;
+			}
+		}
+		break;
+	}
+	case EventType::SpawnAsteroid: {
+		EventQueue::GetInstance().Push(std::make_unique<SpawnAsteroidEvent>(networkID, eventData));	
 		break;
 	}
 							  // Add cases for other lockstepped events here...
@@ -607,6 +615,25 @@ void NetworkEngine::CheckTimeoutsAndHeartbeats() {
 	// Remove timed-out events
 	for (EventID id : eventsToTimeout) {
 		pendingAcks.erase(id);
+	}
+}
+
+void NetworkEngine::CheckAckTimeouts() 
+{
+	static constexpr int ACK_TIMEOUT_MS = 3000; // 3 second
+
+	for (auto& [eventID, pendingInfo] : pendingAcks) {
+		auto timeSinceBroadcast = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - pendingInfo.broadcastTime).count();
+		if (timeSinceBroadcast > ACK_TIMEOUT_MS) {
+			for (auto& client : clientManager.GetClients()) {
+				if (pendingInfo.acksReceived.find(client.clientID) == pendingInfo.acksReceived.end()) {
+					std::cerr << "[Host] ACK timeout for Event ID: " << eventID << " from Client " << client.clientID << std::endl;
+					// Resend the event to the client
+					SendToClient(client, pendingInfo.eventData);
+					pendingInfo.broadcastTime = std::chrono::steady_clock::now(); // Update the broadcast time
+				}
+			}
+		}
 	}
 }
 
