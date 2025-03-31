@@ -12,6 +12,7 @@ public:
 	PlayerBullet(glm::vec3 pos, glm::vec3 dir);
 
 	void Update(double) override;
+	void FixedUpdate(double) override;
 
 	std::vector<char> Serialize() override;
 	void Deserialize(const char*) override;

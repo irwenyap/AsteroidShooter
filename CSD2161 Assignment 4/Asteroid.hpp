@@ -6,6 +6,7 @@ class Asteroid : public GameObject, public NetworkObject {
 public:
 	Asteroid();
 	void Update(double) override;
+	void FixedUpdate(double) override;
 
 	std::vector<char> Serialize() override;
 	void Deserialize(const char*) override;
