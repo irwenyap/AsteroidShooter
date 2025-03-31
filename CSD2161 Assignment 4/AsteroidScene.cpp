@@ -15,6 +15,7 @@
 const double asteroidSpawnRate = 5.0;
 double asteroidSpawnTimer = 0.0;
 bool gameStarted = false;
+std::unordered_map<NetworkID, int> playerScores;
 
 AsteroidScene* g_AsteroidScene = nullptr;
 
@@ -107,7 +108,7 @@ void AsteroidScene::Update(double dt) {
 			NetworkEngine::GetInstance().HandleClientEvent(packet);
 
 			//NetworkEngine::GetInstance().SendToAllClients(packet);
-			std::cout << "Server asteroid spawned at: " << rawAsteroid->position.x << ", " << rawAsteroid->position.y << "\n";
+			std::cout << "Server asteroid spawned at: " << rawAsteroid->position.x << ", " << rawAsteroid->position.y << "with id: " << rawAsteroid->networkID << "\n";
 			asteroidSpawnTimer = 0.0;
 		}
 	}
@@ -181,7 +182,7 @@ void AsteroidScene::ProcessEvents() {
 		case EventType::FireBullet: {
 			auto* fire = static_cast<FireBulletEvent*>(event.get());
 			glm::vec3 dir(cos(fire->rotation), sin(fire->rotation), 0.f);
-			auto bullet = std::make_unique<PlayerBullet>(fire->position, dir);
+			auto bullet = std::make_unique<PlayerBullet>(fire->position, dir, fire->ownerId);
 			bullet->networkID = event.get()->id;
 			NetworkObject* rawBullet = bullet.get();
 			gameObjects.push_back(std::move(bullet));
@@ -314,7 +315,7 @@ void AsteroidScene::ProcessEvents() {
 			Asteroid* rawAsteroid = asteroid.get();
 			gameObjects.push_back(std::move(asteroid));
 			networkedObjects[rawAsteroid->networkID] = rawAsteroid;
-			std::cout << "Client asteroid spawned at: " << spawnEvent->initialPosition.x << ", " << spawnEvent->initialPosition.y << "\n";
+			std::cout << "Client asteroid spawned at: " << spawnEvent->initialPosition.x << ", " << spawnEvent->initialPosition.y << "with id :"<< rawAsteroid->networkID <<"\n";
 			break;
 		}
 		case EventType::Collision: {
@@ -324,29 +325,39 @@ void AsteroidScene::ProcessEvents() {
 
 			std::cout << "[CollisionEvent] Received. Objects to delete: ID A = " << idA << ", ID B = " << idB << "\n";
 
-			//set to store which network ID to delete
 			std::unordered_set<NetworkID> idsToDelete;
+			NetworkID scoringPlayer = 0;
 
-			//Check btwn idA and idB
 			NetworkID ids[2] = { idA, idB };
+
+			// First: figure out what to delete and who should get score
 			for (int i = 0; i < 2; ++i) {
 				NetworkID id = ids[i];
 				auto it = networkedObjects.find(id);
-				
 				if (it != networkedObjects.end()) {
 					auto* obj = it->second;
+
+					// Skip deleting local player
 					if (auto* player = dynamic_cast<Player*>(obj)) {
-						if (player->isLocal) {
-							//std::cout << "[SKIP] Tried to delete local player with ID " << id << " — skipping\n";
-							continue;
-						}
+						if (player->isLocal) continue;
 					}
-					//std::cout << "[Delete] Deleting object with ID " << id << ", type: " << typeid(*obj).name() << "\n";
+
+					// Track who owns the bullet
+					if (auto* bullet = dynamic_cast<PlayerBullet*>(obj)) {
+						scoringPlayer = bullet->playerID;  // bullet's owner
+					}
+
 					idsToDelete.insert(id);
 				}
 			}
 
-			//Remove obj from main gameObjects list
+			// Award score BEFORE deleting the bullet
+			if (scoringPlayer != 0) {
+				g_AsteroidScene->AddScore(scoringPlayer, 1);
+				std::cout << "[Score] +1 point to player ID: " << scoringPlayer << std::endl;
+			}
+
+			// Now remove from gameObjects
 			auto it = std::remove_if(gameObjects.begin(), gameObjects.end(),
 				[&](const std::unique_ptr<GameObject>& go) {
 					auto* netObj = dynamic_cast<NetworkObject*>(go.get());
@@ -354,29 +365,15 @@ void AsteroidScene::ProcessEvents() {
 				});
 			gameObjects.erase(it, gameObjects.end());
 
-			//remove from networkObjects map
+			// Remove from map
 			for (NetworkID id : idsToDelete) {
 				networkedObjects.erase(id);
 			}
 
-			//Host sends the collision even to all clients so it delets the same obj
-			//if (NetworkEngine::GetInstance().isHosting) {
-			//	std::vector<char> packet;
-			//	packet.push_back(NetworkEngine::CMDID::GAME_EVENT);
-			//	packet.push_back(static_cast<char>(EventType::Collision));
-
-			//	NetworkID netIDA = htonl(idA);
-			//	NetworkID netIDB = htonl(idB);
-			//	packet.insert(packet.end(), reinterpret_cast<char*>(&netIDA), reinterpret_cast<char*>(&netIDA) + sizeof(netIDA));
-			//	packet.insert(packet.end(), reinterpret_cast<char*>(&netIDB), reinterpret_cast<char*>(&netIDB) + sizeof(netIDB));
-
-			//	//std::cout << "[Host] Sending CollisionEvent to clients (IDs: " << idA << ", " << idB << ")\n";
-			//	//Send the packet to the clients
-			//	NetworkEngine::GetInstance().HandleClientEvent(packet);
-			//}
-
 			break;
 		}
+
+
 		case EventType::PlayerLeft: {
 			auto* playerLeft = static_cast<PlayerLeftEvent*>(event.get());
 			std::cout << "[Scene] Processing PlayerLeftEvent for NetworkID: " << playerLeft->networkID << std::endl;
@@ -402,6 +399,24 @@ void AsteroidScene::Exit() {
 std::unordered_map<NetworkID, NetworkObject*>& AsteroidScene::GetNetworkedObjects() {
 	return networkedObjects;
 	
+}
+
+std::unordered_map<NetworkID, int>& AsteroidScene::GetPlayerScores() {
+	return playerScores;
+}
+
+void AsteroidScene::AddScore(NetworkID playerId, int points) {
+	playerScores[playerId] += points;
+	std::cout << "[Score] Player " << playerId << " score = " << playerScores[playerId] << "\n";
+}
+
+int AsteroidScene::GetScore(NetworkID playerId) const {
+	auto it = playerScores.find(playerId);
+	return it != playerScores.end() ? it->second : 0;
+}
+
+const std::unordered_map<NetworkID, int>& AsteroidScene::GetAllScores() const {
+	return playerScores;
 }
 
 NetworkObject * AsteroidScene::GetNetworkedObject(NetworkID id) {
