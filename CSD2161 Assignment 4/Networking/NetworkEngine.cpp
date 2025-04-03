@@ -625,25 +625,25 @@ void NetworkEngine::ProcessTickSync(Tick& receivedHostTick, Tick& localTick) {
 }
 
 void NetworkEngine::SendFullStateSnapshot(const sockaddr_in& clientAddr) {
-	std::vector<char> packet;
-	packet.push_back(CMDID::FULL_STATE_SNAPSHOT);
+	//std::vector<char> packet;
+	//packet.push_back(CMDID::FULL_STATE_SNAPSHOT);
 
-	uint32_t activeCount = std::count_if(g_AsteroidScene->gameObjects.begin(), g_AsteroidScene->gameObjects.end(), [](const GameObject& obj) {
-		return obj.isActive;
-	});
+	//uint32_t activeCount = std::count_if(g_AsteroidScene->gameObjects.begin(), g_AsteroidScene->gameObjects.end(), [](const GameObject& obj) {
+	//	return obj.isActive;
+	//});
 
-	NetworkUtils::WriteToPacket(packet, activeCount, NetworkUtils::DT_LONG);
+	//NetworkUtils::WriteToPacket(packet, activeCount, NetworkUtils::DT_LONG);
 
-	for (auto& go : g_AsteroidScene->gameObjects) {
-		if (go->isActive) {
-			if (go->type == GameObject::GO_BULLET) continue;
-			packet.push_back(go->type);
-			auto temp = dynamic_cast<NetworkObject*>(go.get())->Serialize();
-			packet.insert(packet.end(), temp.begin(), temp.end());
-		}
-	}
+	//for (auto& go : g_AsteroidScene->gameObjects) {
+	//	if (go->isActive) {
+	//		if (go->type == GameObject::GO_BULLET) continue;
+	//		packet.push_back(go->type);
+	//		auto temp = dynamic_cast<NetworkObject*>(go.get())->Serialize();
+	//		packet.insert(packet.end(), temp.begin(), temp.end());
+	//	}
+	//}
 
-	socketManager.SendToClient(clientAddr, packet);
+	//socketManager.SendToClient(clientAddr, packet);
 }
 
 void NetworkEngine::HandleFullStateSnapshot(const std::vector<char>& data) {
