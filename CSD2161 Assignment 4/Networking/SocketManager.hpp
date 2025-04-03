@@ -29,11 +29,11 @@ public:
 		return localIP;
 	}
 
+	Server serverInfo;
 private:
 	SOCKET udpListeningSocket = INVALID_SOCKET;
 	SOCKET clientSocket = INVALID_SOCKET;
 
-	Server serverInfo;
 	std::string localIP;
 
 	void SetNonBlocking(SOCKET sock);

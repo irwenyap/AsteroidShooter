@@ -30,6 +30,15 @@ void ShowNetworkUI() {
 
 	ImGui::Begin("Network", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
+	if (ne.isAttemptingReconnect) {
+		ImGui::Text("Reconnecting to server...");
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel")) {
+			//ne.CancelReconnect();
+		}
+		return;
+	}
+
 	if (!ne.isHosting && !ne.isClient) {
 		ImGui::InputText("Port", port, IM_ARRAYSIZE(port));
 		ImGui::SameLine();

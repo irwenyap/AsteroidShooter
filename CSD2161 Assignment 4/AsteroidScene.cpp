@@ -32,7 +32,19 @@ void AsteroidScene::Update(double dt) {
 
 
 	for (auto& go : gameObjects) {
-		go->Update(dt);
+		if (go->isActive) {
+			go->Update(dt);
+
+			//if (go->type != GameObject::GO_PLAYER) {
+			//	if (go->position.x > 1920.f || go->position.x < -1920.f || go->position.y > 1080.f || go->position.y < 1080.f)
+			//		go->isActive = false;
+			//} else {
+			//	if (go->position.x > 960.f)
+			//		go->position.x = -950.f;
+			//	else if (go->position.x < -960.f)
+			//		go->position.x = 950.f;
+			//}
+		}
 	}
 	if (gameStarted && NetworkEngine::GetInstance().isHosting) {
 		asteroidSpawnTimer += dt;
@@ -56,6 +68,7 @@ void AsteroidScene::Update(double dt) {
 			asteroid->scale = glm::vec3(randomScale, randomScale, 1.f);
 			asteroid->velocity = glm::vec3(velocityX(gen), velocityY(gen), 0.f);
 			asteroid->rotation = 0.f;
+			asteroid->type = GameObject::GO_ASTEROID;
 			asteroid->meshType = Mesh::MESH_TYPE::QUAD;
 			asteroid->textured = true;
 			asteroid->textureType = Texture::TEXTURE_TYPE::TEX_ASTEROID;
@@ -116,7 +129,20 @@ void AsteroidScene::Update(double dt) {
 
 void AsteroidScene::FixedUpdate(double fixedDT) {
 	for (auto& go : gameObjects) {
-		go->FixedUpdate(fixedDT);
+		if (go->isActive) {
+			go->FixedUpdate(fixedDT);
+
+			if (go->type != GameObject::GO_PLAYER) {
+				if (go->position.x > 50.f || go->position.x < -50.f)
+					go->isActive = false;
+			} else {
+				std::cout << go->position.y << std::endl;
+				if (go->position.x > 46.f)
+					go->position.x = -45.f;
+				else if (go->position.x < -46.f)
+					go->position.x = 45.f;
+			}
+		}
 	}
 
 	// Setting only host to detect for collision
@@ -152,7 +178,7 @@ void AsteroidScene::FixedUpdate(double fixedDT) {
 
 			//Push a collisionEvent into event queue of both objects
 			if (dist < collisionDist) {
-				if (NetworkEngine().GetInstance().isHosting) {
+				if (NetworkEngine::GetInstance().isHosting) {
 					std::vector<char> packet;
 					packet.push_back(NetworkEngine::CMDID::GAME_EVENT);
 					packet.push_back(static_cast<char>(EventType::Collision));
@@ -164,7 +190,7 @@ void AsteroidScene::FixedUpdate(double fixedDT) {
 
 					NetworkEngine::GetInstance().HandleClientEvent(packet);
 				}
-				else if (NetworkEngine().GetInstance().isClient) {
+				else if (NetworkEngine::GetInstance().isClient) {
 					auto collision = std::make_unique<CollisionEvent>(bullet->networkID, asteroid->networkID);
 					NetworkEngine::GetInstance().SendEventToServer(std::move(collision));
 				}
@@ -203,6 +229,7 @@ void AsteroidScene::ProcessEvents() {
 				localPlayer->position = glm::vec3(0, 0, 0);
 				localPlayer->scale = glm::vec3(1.5f, 1.5f, 1.5f);
 				localPlayer->rotation = 0.f;
+				localPlayer->type = GameObject::GO_PLAYER;
 				localPlayer->meshType = Mesh::MESH_TYPE::QUAD;
 				localPlayer->isLocal = true;
 				localPlayer->color = { 0.2f, 1.f, 0.2f, 1.f };
@@ -224,6 +251,7 @@ void AsteroidScene::ProcessEvents() {
 				remotePlayer->position = glm::vec3(0, 0, 0);
 				remotePlayer->scale = glm::vec3(1.5f, 1.5f, 1.5f);
 				remotePlayer->rotation = 0.f;
+				remotePlayer->type = GameObject::GO_PLAYER;
 				remotePlayer->meshType = Mesh::MESH_TYPE::QUAD;
 				remotePlayer->isLocal = false;
 				remotePlayer->color = { 0.2f, 0.2f, 1.f, 1.f };
@@ -256,6 +284,7 @@ void AsteroidScene::ProcessEvents() {
 			newPlayer->position = glm::vec3(0, 0, 0);
 			newPlayer->scale = glm::vec3(1.5f, 1.5f, 1.5f);
 			newPlayer->rotation = 0.f;
+			newPlayer->type = GameObject::GO_PLAYER;
 			newPlayer->meshType = Mesh::MESH_TYPE::QUAD;
 			newPlayer->isLocal = true;
 			newPlayer->color = { 0.2f, 1.f, 0.2f, 1.f };
@@ -277,6 +306,7 @@ void AsteroidScene::ProcessEvents() {
 			newPlayer->position = glm::vec3(0, 0, 0);
 			newPlayer->scale = glm::vec3(1.5f, 1.5f, 1.5f);
 			newPlayer->rotation = 0.f;
+			newPlayer->type = GameObject::GO_PLAYER;
 			newPlayer->meshType = Mesh::MESH_TYPE::QUAD;
 			newPlayer->isLocal = false;
 			newPlayer->color = { 0.2f, 0.2f, 1.f, 1.f };
@@ -307,6 +337,7 @@ void AsteroidScene::ProcessEvents() {
 			asteroid->scale = spawnEvent->initialScale;
 			asteroid->velocity = spawnEvent->initialVelocity;
 			asteroid->rotation = 0.f;
+			asteroid->type = GameObject::GO_ASTEROID;
 			asteroid->meshType = Mesh::MESH_TYPE::QUAD;
 			asteroid->color = { 1.f, 1.f, 1.f, 1.f };
 			asteroid->textured = true;

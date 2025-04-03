@@ -75,7 +75,7 @@ bool SocketManager::ConnectWithHandshake(const std::string& ip, const std::strin
 {
     if (!Connect(ip, port)) return false;
 
-    const int maxRetries = 5;
+    const int maxRetries = 10;
     int retryCount = 0;
     bool connectionEstablished = false;
     uint8_t cmd = sendCommand;
