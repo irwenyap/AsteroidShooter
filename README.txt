@@ -1,32 +1,48 @@
-Assignment 4 – Multiplayer Asteroids Game
-Developed by:
-Irwen Yap Zi Yang
-Thang Weng Khong
-Tan Yong Chin
-Wilmer Lee Jun Rong
+######################################## ASSIGNMENT 4 #############################################
 
-How to Start the Game
-Hosting (Server):
-Launch the application.
-Enter a desired port number (e.g., 5000) in the text field.
-Click "Host" to start the server and begin listening for client connections.
+Developed by: Irwen, Weng Khong, Yong Chin, Wilmer
 
-Joining (Client):
-On client machines, launch the same application.
-Input the IP address of the host (e.g., 192.168.1.2) and the same port number used by the host.
-Click "Connect" to join the server.
+Unzip folder to access executable files.
 
-Starting the Game:
-Once all players are connected, the host should click "Start Game" to begin the multiplayer session.
-All players will then be spawned and the game will synchronize across all screens
+######################################## HOW TO START #############################################
+1. On the Server side, click 'Host' and wait for players (clients) to connect to the game.
+2. On each Client, input the Server’s IP address and port number, then click 'Connect'.
+3. Once all clients are connected, click 'Start Game' on the server to begin the game.
+######################################## HOW TO PLAY ##############################################
 
-Gameplay Controls:
-W / A / S / D – Move your spaceship (Up / Left / Down / Right)
-Spacebar – Fire bullets
+Controls:
+- W, A, S, D: Move your ship
+- Space: Fire bullet
 
-Game Features:
-Real-time movement and bullet synchronization
-Host-spawned asteroid events propagated using event IDs and ACKs
-Deterministic collision detection and score updates
-Reconnection and heartbeat detection system for network durability
-End-of-game scoreboard showing synchronized player scores
+######################################## INPUT PARAMETERS ##########################################
+
+****************** Server Input Parameters ******************
+
+a) Server port number
+
+****************** Client Input Parameters ******************
+
+a) Server IP address
+
+b) Server port number
+
+
+###################################################################################################
+###################################### HOW IT WORKS ###############################################
+- The **server controls all authoritative logic**, including:
+  - Spawning asteroids
+
+  - Collision detection
+
+  - Score tracking
+
+- **Clients send input only** (e.g., movement, firing bullets)
+
+- **Collision Handling:**
+
+  - When a bullet hits an asteroid, both are deleted across all machines.
+
+  - The bullet’s owner (tracked via `playerID`) receives **+1 score**.
+
+- **Scores** are tracked per player by their `NetworkID`, and displayed on the host and client UI.
+###################################################################################################
