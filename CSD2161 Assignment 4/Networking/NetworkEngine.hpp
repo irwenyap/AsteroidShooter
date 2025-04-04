@@ -55,6 +55,7 @@ public:
 	void SendEventToServer(std::unique_ptr<GameEvent> event); // Client function
 	void SendToAllClients(std::vector<char> packet);
 	void SendToClient(const Client& client, const std::vector<char>& packet); // Specific client send
+	void SendtoClientSameEvent(const Client& client, EventID eid, const std::vector<char>& packet);
 	void SendToOtherClients(const sockaddr_in& reqClient, std::vector<char> packet);
 	void HandleIncomingConnection(const std::vector<char>& data, const sockaddr_in& clientAddr);
 	void HandleClientEvent(const std::vector<char>& data); //tmp hack for server to send to itself

@@ -278,13 +278,13 @@ void AsteroidScene::ProcessEvents() {
 				//packet.push_back(nameLen);
 				//packet.insert(packet.end(), remotePlayerName.begin(), remotePlayerName.begin() + nameLen);
 			}
-
+			EventID eid = NetworkEngine::GetInstance().GenerateEventID();
 			int i = 1;
 			for (auto& client : NetworkEngine::GetInstance().clientManager.GetClients()) {
 				std::vector<char> clientPacket(packet);
 				clientPacket[i++ * 5 + 3] = static_cast<char>(EventType::SpawnPlayer);
-				NetworkEngine::GetInstance().HandleClientEvent(clientPacket);
-				//NetworkEngine::GetInstance().SendToClient(client, clientPacket);
+				//NetworkEngine::GetInstance().HandleClientEvent(clientPacket);
+				NetworkEngine::GetInstance().SendtoClientSameEvent(client, eid,clientPacket);
 			}
 			gameStarted = true;
 			break;
