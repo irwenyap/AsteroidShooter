@@ -8,6 +8,7 @@
 #include <iostream>
 #include <glm/geometric.hpp>
 #include <glm/gtc/constants.hpp>
+#include "Events/EventQueue.hpp"
 
 
 // utility function to be moved
@@ -34,11 +35,12 @@ void Player::Update(double)
 			if (NetworkEngine::GetInstance().isClient) {
 				NetworkEngine::GetInstance().SendEventToServer(std::move(fireEvent));
 			}
-			else if (NetworkEngine::GetInstance().isHosting) {
+			else if (NetworkEngine::GetInstance().isHosting && NetworkEngine::GetInstance().GetNumConnectedClients() > 0) {
  				NetworkEngine::GetInstance().ServerBroadcastEvent(std::move(fireEvent));
-			}
-            
-            // EventQueue::GetInstance().Push(std::make_unique<FireBulletEvent>(position, rotation, networkID)); // OLD WAY
+            }
+            else if(NetworkEngine::GetInstance().isHosting){
+                EventQueue::GetInstance().Push(std::make_unique<FireBulletEvent>(position, rotation, networkID));
+            }
         }
 
         if (glm::length(position - prevPos) > 1.f || std::abs(rotation - prevRot) > 0.1f) {
