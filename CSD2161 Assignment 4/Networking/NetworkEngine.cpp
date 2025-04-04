@@ -97,9 +97,9 @@ void NetworkEngine::Update(double) {
 		}
 
 		//auto now = std::chrono::steady_clock::now();
-		auto timeSinceLastResponse = std::chrono::duration_cast<std::chrono::seconds>(
-			now - lastServerResponseTime
-		).count();
+		//auto timeSinceLastResponse = std::chrono::duration_cast<std::chrono::seconds>(
+		//	now - lastServerResponseTime
+		//).count();
 
 		// Detect disconnection
 		//if (timeSinceLastResponse > 5 && !isAttemptingReconnect) { // 5 seconds timeout
@@ -245,7 +245,7 @@ void NetworkEngine::ServerBroadcastEvent(std::unique_ptr<GameEvent> event)
 	} // end switch
 
 	EventID currentEventID = nextEventID++;
-	EventType eventType = event->type;
+	//EventType eventType = event->type;
 
 	PendingEventInfo info;
 	info.eventData = std::move(data);
@@ -479,10 +479,10 @@ void NetworkEngine::HandleAckEvent(const std::vector<char>& data, const sockaddr
 			NetworkUtils::ReadFromPacket(eventData.data(), offset, tempOwner, NetworkUtils::DATA_TYPE::DT_LONG); offset += 4;
 			ownerId = tempOwner;
 
-			auto it = std::make_unique<FireBulletEvent>(pos, rot, ownerId);
-			it->id = ntohl(newNetworkID);
+			auto it2 = std::make_unique<FireBulletEvent>(pos, rot, ownerId);
+			it2->id = ntohl(newNetworkID);
 
-			EventQueue::GetInstance().Push(std::move(it));
+			EventQueue::GetInstance().Push(std::move(it2));
 			break;
 		}
 		case EventType::Collision: {
@@ -491,9 +491,9 @@ void NetworkEngine::HandleAckEvent(const std::vector<char>& data, const sockaddr
 			std::memcpy(&b, &eventData[offset], sizeof(NetworkID)); offset += sizeof(NetworkID);
 			a = ntohl(a);
 			b = ntohl(b);
-			auto it = std::make_unique<CollisionEvent>(a, b);
-			it->id = ntohl(newNetworkID);
-			EventQueue::GetInstance().Push(std::move(it));
+			auto it2 = std::make_unique<CollisionEvent>(a, b);
+			it2->id = ntohl(newNetworkID);
+			EventQueue::GetInstance().Push(std::move(it2));
 			break;
 		}
 		case EventType::StartGame: {
@@ -579,10 +579,11 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 
 	// Reconstruct and push the event to the local queue
 	// Need to skip the EventType byte in eventData when passing to specific event constructors/deserializers
-	size_t offset = 1; // Start reading data *after* the EventType byte
+	//size_t offset = 1; // Start reading data *after* the EventType byte
 
 	switch (eventType) {
 	case EventType::FireBullet: {
+		int offset = 1;
 		if (eventData.size() < offset + (sizeof(float) * 3) + sizeof(float) + sizeof(uint32_t)) { // Basic size check for vec3 + float + uint32
 			std::cerr << "[Client] Insufficient data for FireBulletEvent ID: " << eventID << std::endl;
 			break;
@@ -598,22 +599,22 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 		NetworkUtils::ReadFromPacket(eventData.data(), offset, tempOwner, NetworkUtils::DATA_TYPE::DT_LONG); offset += 4;
 		ownerId = tempOwner;
 
-		auto it = std::make_unique<FireBulletEvent>(pos, rot, ownerId);
-		it->id = networkID;
+		auto it2 = std::make_unique<FireBulletEvent>(pos, rot, ownerId);
+		it2->id = networkID;
 
-		EventQueue::GetInstance().Push(std::move(it));
+		EventQueue::GetInstance().Push(std::move(it2));
 		break;
 	}
 	case EventType::StartGame: {
 		int offset = 2;
 		for (uint8_t i = 0; i < eventData[1]; ++i) {
-			uint8_t eventType = eventData[offset++];
+			uint8_t eventTypeData = eventData[offset++];
 			NetworkID networkID;
 			std::memcpy(&networkID, &eventData[offset], sizeof(networkID));
 			networkID = ntohl(networkID);
 			offset += sizeof(networkID);
 
-			switch (eventType) {
+			switch (eventTypeData) {
 			case static_cast<uint8_t>(EventType::SpawnPlayer):
 				EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
 				break;
@@ -717,9 +718,9 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 		idA = ntohl(idA);
 		idB = ntohl(idB);
 
-		auto it = std::make_unique<CollisionEvent>(idA, idB);
-		it->id = networkID;
-		EventQueue::GetInstance().Push(std::move(it));
+		auto it2 = std::make_unique<CollisionEvent>(idA, idB);
+		it2->id = networkID;
+		EventQueue::GetInstance().Push(std::move(it2));
 		break;
 	}
 							  // Add cases for other lockstepped events here...
@@ -735,7 +736,8 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 }
 
 
-void NetworkEngine::ProcessTickSync(Tick& receivedHostTick, Tick& localTick) {
+void NetworkEngine::ProcessTickSync(Tick&, Tick&) 
+{
 
 }
 
@@ -743,22 +745,22 @@ void NetworkEngine::SendFullStateSnapshot(const sockaddr_in& clientAddr) {
 	std::vector<char> packet;
 	packet.push_back(CMDID::FULL_STATE_SNAPSHOT);
 
-	uint32_t activeCount = std::count_if(g_AsteroidScene->gameObjects.begin(), g_AsteroidScene->gameObjects.end(), [](const std::unique_ptr<GameObject>& obj) {
+	size_t activeCount = std::count_if(g_AsteroidScene->gameObjects.begin(), g_AsteroidScene->gameObjects.end(), [](const std::unique_ptr<GameObject>& obj) {
 		return obj->isActive;
 	});
 
-	//NetworkUtils::WriteToPacket(packet, activeCount, NetworkUtils::DT_LONG);
+	NetworkUtils::WriteToPacket(packet, activeCount, NetworkUtils::DT_LONG);
 
-	//for (auto& go : g_AsteroidScene->gameObjects) {
-	//	if (go->isActive) {
-	//		if (go->type == GameObject::GO_BULLET) continue;
-	//		packet.push_back(go->type);
-	//		auto temp = dynamic_cast<NetworkObject*>(go.get())->Serialize();
-	//		packet.insert(packet.end(), temp.begin(), temp.end());
-	//	}
-	//}
+	for (auto& go : g_AsteroidScene->gameObjects) {
+		if (go->isActive) {
+			if (go->type == GameObject::GO_BULLET) continue;
+			packet.push_back(static_cast<char>(go->type));
+			auto temp = dynamic_cast<NetworkObject*>(go.get())->Serialize();
+			packet.insert(packet.end(), temp.begin(), temp.end());
+		}
+	}
 
-	//socketManager.SendToClient(clientAddr, packet);
+	socketManager.SendToClient(clientAddr, packet);
 }
 
 void NetworkEngine::HandleFullStateSnapshot(const std::vector<char>& data) {

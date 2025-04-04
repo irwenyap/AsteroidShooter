@@ -15,8 +15,8 @@ namespace NetworkUtils {
     template <typename T>
     void WriteToPacket(std::vector<char>& packet, const T& data, DATA_TYPE type) {
         T netData;
-        if (type == DT_SHORT) netData = htons(data);
-        else if (type == DT_LONG) netData = htonl(data);
+        if (type == DT_SHORT) netData = htons(static_cast<uint16_t>(data));
+        else if (type == DT_LONG) netData = htonl(static_cast<uint32_t>(data));
         else netData = data;
 
         const char* rawData = reinterpret_cast<const char*>(&netData);
@@ -46,7 +46,7 @@ namespace NetworkUtils {
         std::memcpy(&outData, &packet[offset], sizeof(T));
 
         if (type == DT_SHORT) {
-            outData = ntohs(outData);
+            outData = ntohs(static_cast<uint16_t>(outData));
         } else if (type == DT_LONG) {
             outData = ntohl(outData);
         }

@@ -99,12 +99,12 @@ void ShowNetworkUI() {
 			ImGui::Separator();
 			ImGui::Text("Scores:");
 
-			const auto& scores = g_AsteroidScene->GetAllScores();
-			if (scores.empty()) {
+			const auto& allScores = g_AsteroidScene->GetAllScores();
+			if (allScores.empty()) {
 				ImGui::Text("No scores yet.");
 			}
 			else {
-				for (const auto& [playerID, score] : scores) {
+				for (const auto& [playerID, score] : allScores) {
 					ImGui::Text("Player %u: %d", playerID, score);
 				}
 			}
@@ -211,8 +211,8 @@ void Application::Run() {
 	}
 	extern AsteroidScene* g_AsteroidScene;
 	std::vector<HighScore> currentHighscores;
-	for (const auto& scores : g_AsteroidScene->GetAllScores()) {
-		currentHighscores.push_back(HighScore{std::to_string(scores.first), scores.second });
+	for (const auto& score : g_AsteroidScene->GetAllScores()) {
+		currentHighscores.push_back(HighScore{std::to_string(score.first), score.second });
 	}
 	SaveHighScores(currentHighscores);
 

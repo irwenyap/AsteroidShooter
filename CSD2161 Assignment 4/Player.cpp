@@ -22,7 +22,7 @@ Player::Player() {
     targetPos = position;
 }
 
-void Player::Update(double dt)
+void Player::Update(double)
 {
     if (isLocal) {
         InputManager& input = InputManager::GetInstance();
