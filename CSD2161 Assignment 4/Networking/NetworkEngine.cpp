@@ -702,18 +702,18 @@ void NetworkEngine::SendFullStateSnapshot(const sockaddr_in& clientAddr) {
 		return obj->isActive;
 	});
 
-	NetworkUtils::WriteToPacket(packet, activeCount, NetworkUtils::DT_LONG);
+	//NetworkUtils::WriteToPacket(packet, activeCount, NetworkUtils::DT_LONG);
 
-	for (auto& go : g_AsteroidScene->gameObjects) {
-		if (go->isActive) {
-			if (go->type == GameObject::GO_BULLET) continue;
-			packet.push_back(go->type);
-			auto temp = dynamic_cast<NetworkObject*>(go.get())->Serialize();
-			packet.insert(packet.end(), temp.begin(), temp.end());
-		}
-	}
+	//for (auto& go : g_AsteroidScene->gameObjects) {
+	//	if (go->isActive) {
+	//		if (go->type == GameObject::GO_BULLET) continue;
+	//		packet.push_back(go->type);
+	//		auto temp = dynamic_cast<NetworkObject*>(go.get())->Serialize();
+	//		packet.insert(packet.end(), temp.begin(), temp.end());
+	//	}
+	//}
 
-	socketManager.SendToClient(clientAddr, packet);
+	//socketManager.SendToClient(clientAddr, packet);
 }
 
 void NetworkEngine::HandleFullStateSnapshot(const std::vector<char>& data) {
