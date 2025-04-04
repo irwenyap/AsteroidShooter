@@ -235,7 +235,7 @@ void AsteroidScene::ProcessEvents() {
 				localPlayer->color = { 0.2f, 1.f, 0.2f, 1.f };
 				localPlayer->textured = true;
 				localPlayer->textureType = Texture::TEXTURE_TYPE::TEX_PLAYER;
-				NetworkEngine::GetInstance().playerNames[localPlayer->networkID] = g_PlayerName;
+				//NetworkEngine::GetInstance().playerNames[localPlayer->networkID] = g_PlayerName;
 
 				Player* rawPlayerPtr = localPlayer.get();
 				gameObjects.push_back(std::move(localPlayer));
