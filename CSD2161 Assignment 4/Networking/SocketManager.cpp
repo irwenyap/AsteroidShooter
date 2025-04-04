@@ -64,7 +64,7 @@ bool SocketManager::Connect(const std::string& ip, const std::string& port)
     }
 
     serverInfo.ipAddress = ip;
-    serverInfo.port = std::stoi(port);
+    serverInfo.port = static_cast<uint16_t>(std::stoi(port));
     memcpy(&serverInfo.address, info->ai_addr, sizeof(serverInfo.address));
     freeaddrinfo(info);
 
