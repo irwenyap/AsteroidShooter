@@ -71,7 +71,8 @@ bool SocketManager::Connect(const std::string& ip, const std::string& port)
 	return true;
 }
 
-bool SocketManager::ConnectWithHandshake(const std::string& ip, const std::string& port, uint8_t sendCommand, uint8_t expectedResponse)
+bool SocketManager::ConnectWithHandshake(const std::string& ip, const std::string& port, uint8_t sendCommand, uint8_t expectedResponse,
+    const std::string& playerName)
 {
     if (!Connect(ip, port)) return false;
 
@@ -83,7 +84,16 @@ bool SocketManager::ConnectWithHandshake(const std::string& ip, const std::strin
     timeval timeout = { 1, 0 }; // 1 second timeout
 
     while (!connectionEstablished && retryCount < maxRetries) {
-        bool success = SendToHost(static_cast<char>(cmd));
+        std::vector<char> packet;
+        packet.push_back(static_cast<char>(cmd));
+
+        uint8_t nameLen = static_cast<uint8_t>(std::min<size_t>(playerName.size(), 255));
+        packet.push_back(static_cast<char>(nameLen));
+
+        packet.insert(packet.end(), playerName.begin(), playerName.begin() + nameLen);
+
+
+        bool success = SendToHost(packet);
         if (!success) {
             std::cerr << "sendto() failed. Error: " << WSAGetLastError() << "\n";
             break;

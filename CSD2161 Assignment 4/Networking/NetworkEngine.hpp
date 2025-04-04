@@ -47,7 +47,7 @@ public:
 	void Initialize();
 	void Update(double);
 	bool Host(std::string);
-	bool Connect(std::string, std::string);
+	bool Connect(std::string, std::string, const std::string&);
 	void Exit();
 
 	void AttemptReconnect();
@@ -80,6 +80,7 @@ public:
 
 	bool isAttemptingReconnect = false;
 	std::chrono::steady_clock::time_point lastServerResponseTime{};
+	std::unordered_map<NetworkID, std::string> playerNames;
 private:
 	NetworkEngine() = default;
 	~NetworkEngine() = default;

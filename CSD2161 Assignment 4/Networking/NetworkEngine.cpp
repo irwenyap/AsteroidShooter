@@ -102,11 +102,11 @@ void NetworkEngine::Update(double) {
 		).count();
 
 		// Detect disconnection
-		if (timeSinceLastResponse > 5 && !isAttemptingReconnect) { // 5 seconds timeout
-			std::cout << "Connection lost. Attempting to reconnect..." << std::endl;
-			isAttemptingReconnect = true;
-			AttemptReconnect();
-		}
+		//if (timeSinceLastResponse > 5 && !isAttemptingReconnect) { // 5 seconds timeout
+		//	std::cout << "Connection lost. Attempting to reconnect..." << std::endl;
+		//	isAttemptingReconnect = true;
+		//	AttemptReconnect();
+		//}
 
 		while (socketManager.ReceiveFromHost(data)) {
 			if (data.empty()) continue;
@@ -155,9 +155,9 @@ bool NetworkEngine::Host(std::string portNumber) {
 	return isHosting;
 }
 
-bool NetworkEngine::Connect(std::string host, std::string portNumber) {
+bool NetworkEngine::Connect(std::string host, std::string portNumber, const std::string& playerName) {
 	isClient = socketManager.ConnectWithHandshake(host, portNumber,
-		CMDID::REQ_CONNECTION, CMDID::RSP_CONNECTION);
+		CMDID::REQ_CONNECTION, CMDID::RSP_CONNECTION, playerName);
 
 	if (isClient) {
 		isHosting = false;
@@ -176,7 +176,7 @@ void NetworkEngine::AttemptReconnect() {
 	std::thread([this]() {
 		while (isAttemptingReconnect) {
 			if (socketManager.ConnectWithHandshake(socketManager.serverInfo.ipAddress, std::to_string(socketManager.serverInfo.port),
-				CMDID::REQ_RECONNECT, CMDID::RSP_RECONNECT)) {
+				CMDID::REQ_RECONNECT, CMDID::RSP_RECONNECT, "hello")) {
 				std::cout << "Reconnected successfully!" << std::endl;
 				isAttemptingReconnect = false;
 
@@ -285,14 +285,14 @@ void NetworkEngine::SendToOtherClients(const sockaddr_in& reqClient, std::vector
 		if (client.address.sin_addr.s_addr == reqClient.sin_addr.s_addr &&
 			client.address.sin_port == reqClient.sin_port) continue;
 
-		socketManager.SendToClient(client.address, packet);
+		socketManager.SendToClient(client.address, packet);	
 	}
 }
 
 // Host side handling
 void NetworkEngine::HandleIncomingConnection(const std::vector<char>& data, const sockaddr_in& clientAddr)
 {
-	if (data.empty() || data[0] != REQ_CONNECTION || data[0] != REQ_RECONNECT) return;
+	if (data.empty() || (data[0] != REQ_CONNECTION && data[0] != REQ_RECONNECT)) return;
 
 	if (data[0] == CMDID::REQ_RECONNECT) {
 		// Find existing client
@@ -308,12 +308,25 @@ void NetworkEngine::HandleIncomingConnection(const std::vector<char>& data, cons
 			SendFullStateSnapshot(clientAddr);
 		}
 	} else if (!clientManager.IsKnownClient(clientAddr)) {
+		uint8_t nameLen = 0;
+		if (data.size() > 1) {
+			nameLen = static_cast<uint8_t>(data[1]);
+		}
+		// ensure we have enough bytes:
+		if (data.size() < 2 + nameLen) {
+			std::cerr << "[Host] Invalid REQ_CONNECTION: Not enough data for name.\n";
+			return;
+		}
+		std::string playerName(data.begin() + 2, data.begin() + 2 + nameLen);
+
 		clientManager.AddClient(clientAddr);
 		//EventQueue::GetInstance().Push(std::make_unique<ClientJoinedEvent>());
 
 		auto newClientOpt = clientManager.GetClientByAddr(clientAddr);
 		if (newClientOpt) {
 			socketManager.SendToClient(clientAddr, static_cast<char>(RSP_CONNECTION)); // Send ACK first
+			auto& clientRef = newClientOpt.value().get();
+			playerNames[clientRef.clientID] = playerName;
 			//SendInitialState(newClientOpt.value().get()); // Then send current state
 
 		}
@@ -567,9 +580,30 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 		break;
 	}
 	case EventType::StartGame: {
-		int offset = 2;
+		//int offset = 2;
+		//for (uint8_t i = 0; i < eventData[1]; ++i) {
+		//	uint8_t eventType = eventData[offset++];
+		//	NetworkID networkID;
+		//	std::memcpy(&networkID, &eventData[offset], sizeof(networkID));
+		//	networkID = ntohl(networkID);
+		//	offset += sizeof(networkID);
+
+		//	switch (eventType) {
+		//	case static_cast<uint8_t>(EventType::SpawnPlayer):
+		//		EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
+		//		break;
+		//	case static_cast<uint8_t>(EventType::PlayerJoined):
+		//		EventQueue::GetInstance().Push(std::make_unique<PlayerJoinedEvent>(networkID));
+		//		break;
+		//	}
+		//}
+		//break;
+		int offset = 2;  // skip [CMDID] and [EventType], which are the first 2 bytes
+
 		for (uint8_t i = 0; i < eventData[1]; ++i) {
 			uint8_t eventType = eventData[offset++];
+
+			// 1) Parse the network ID
 			NetworkID networkID;
 			std::memcpy(&networkID, &eventData[offset], sizeof(networkID));
 			networkID = ntohl(networkID);
@@ -577,11 +611,47 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 
 			switch (eventType) {
 			case static_cast<uint8_t>(EventType::SpawnPlayer):
+				// Next we parse the name length + name
+				// (same structure if you also appended name for SpawnPlayer)
+			{
+				uint8_t nameLen = eventData[offset++];
+				std::string playerName(
+					eventData.begin() + offset,
+					eventData.begin() + offset + nameLen
+				);
+				offset += nameLen;
+
+				// Now you have the player's name. Store it or log it.
+				NetworkEngine::GetInstance().playerNames[networkID] = playerName;
+
+				// Push the normal SpawnPlayerEvent
 				EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
-				break;
+
+				// Optional: Print for debugging
+				std::cout << "[StartGame] SpawnPlayer with ID=" << networkID
+					<< ", name=" << playerName << std::endl;
+			}
+			break;
+
 			case static_cast<uint8_t>(EventType::PlayerJoined):
+			{
+				// parse nameLen
+				uint8_t nameLen = eventData[offset++];
+				// read that many chars from eventData
+				std::string playerName(
+					eventData.begin() + offset,
+					eventData.begin() + offset + nameLen
+				);
+				offset += nameLen;
+
+				// store or log it
+				NetworkEngine::GetInstance().playerNames[networkID] = playerName;
+
 				EventQueue::GetInstance().Push(std::make_unique<PlayerJoinedEvent>(networkID));
-				break;
+				std::cout << "[StartGame] PlayerJoined with ID=" << networkID
+					<< ", name=" << playerName << std::endl;
+			}
+			break;
 			}
 		}
 		break;
@@ -628,8 +698,8 @@ void NetworkEngine::SendFullStateSnapshot(const sockaddr_in& clientAddr) {
 	std::vector<char> packet;
 	packet.push_back(CMDID::FULL_STATE_SNAPSHOT);
 
-	uint32_t activeCount = std::count_if(g_AsteroidScene->gameObjects.begin(), g_AsteroidScene->gameObjects.end(), [](const GameObject& obj) {
-		return obj.isActive;
+	uint32_t activeCount = std::count_if(g_AsteroidScene->gameObjects.begin(), g_AsteroidScene->gameObjects.end(), [](const std::unique_ptr<GameObject>& obj) {
+		return obj->isActive;
 	});
 
 	NetworkUtils::WriteToPacket(packet, activeCount, NetworkUtils::DT_LONG);

@@ -14,7 +14,8 @@ public:
 	bool Host(const std::string& port);
 	bool Connect(const std::string& ip, const std::string& port);
 	bool ConnectWithHandshake(const std::string& ip, const std::string& port, 
-		uint8_t sendCommand, uint8_t expectedResponse);
+		uint8_t sendCommand, uint8_t expectedResponse,
+		const std::string& playerName);
 	void Cleanup();
 
 	bool SendToClient(const sockaddr_in& clientAddr, const std::vector<char>& data);

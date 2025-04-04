@@ -18,7 +18,7 @@ bool gameStarted = false;
 std::unordered_map<NetworkID, int> playerScores;
 
 AsteroidScene* g_AsteroidScene = nullptr;
-
+extern std::string g_PlayerName;
 
 void AsteroidScene::Initialize() {
 	GraphicsEngine::GetInstance().Init();
@@ -235,6 +235,7 @@ void AsteroidScene::ProcessEvents() {
 				localPlayer->color = { 0.2f, 1.f, 0.2f, 1.f };
 				localPlayer->textured = true;
 				localPlayer->textureType = Texture::TEXTURE_TYPE::TEX_PLAYER;
+				NetworkEngine::GetInstance().playerNames[localPlayer->networkID] = g_PlayerName;
 
 				Player* rawPlayerPtr = localPlayer.get();
 				gameObjects.push_back(std::move(localPlayer));
@@ -243,6 +244,11 @@ void AsteroidScene::ProcessEvents() {
 				NetworkID netNID = htonl(rawPlayerPtr->networkID);
 				packet.insert(packet.end(), reinterpret_cast<char*>(&netNID),
 					reinterpret_cast<char*>(&netNID) + sizeof(netNID));
+
+				uint8_t nameLen = (uint8_t)std::min<size_t>(g_PlayerName.size(), 255);
+				packet.push_back(nameLen);
+				packet.insert(packet.end(), g_PlayerName.begin(), g_PlayerName.begin() + nameLen);
+
 			}
 
 			for (int i = 0; i < NetworkEngine::GetInstance().GetNumConnectedClients(); ++i) {
@@ -265,6 +271,12 @@ void AsteroidScene::ProcessEvents() {
 				NetworkID netNID = htonl(rawRemote->networkID);
 				packet.insert(packet.end(), reinterpret_cast<char*>(&netNID),
 					reinterpret_cast<char*>(&netNID) + sizeof(netNID));
+
+				//auto newClientOpt = NetworkEngine::GetInstance().clientManager.GetClientByAddr(clientAddr);
+				auto& remotePlayerName = NetworkEngine::GetInstance().playerNames[rawRemote->networkID];
+				uint8_t nameLen = (uint8_t)std::min<size_t>(remotePlayerName.size(), 255);
+				packet.push_back(nameLen);
+				packet.insert(packet.end(), remotePlayerName.begin(), remotePlayerName.begin() + nameLen);
 			}
 
 			int i = 1;
@@ -290,7 +302,9 @@ void AsteroidScene::ProcessEvents() {
 			newPlayer->color = { 0.2f, 1.f, 0.2f, 1.f };
 			newPlayer->textured = true;
 			newPlayer->textureType = Texture::TEXTURE_TYPE::TEX_PLAYER;
+			std::string playerName = 
 			//std::cout << "Local Player Network ID: " << newPlayer->networkID << std::endl;
+			NetworkEngine::GetInstance().playerNames[newPlayer->networkID] = playerName;
 
 			Player* rawPlayerPtr = newPlayer.get();
 
