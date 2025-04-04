@@ -6,6 +6,8 @@
 
 #include "../Events/EventQueue.hpp"
 #include "../AsteroidScene.hpp" // HACK: Include scene for now for state access.
+#include <thread>
+#include <algorithm>
 
 // Tell the Visual Studio linker to include the following library in linking.
 // Alternatively, we could add this file to the linker command-line parameters,
@@ -94,11 +96,22 @@ void NetworkEngine::Update(double) {
 			lastHeartbeatSentTime = now;
 		}
 
+		//auto now = std::chrono::steady_clock::now();
+		auto timeSinceLastResponse = std::chrono::duration_cast<std::chrono::seconds>(
+			now - lastServerResponseTime
+		).count();
+
+		// Detect disconnection
+		//if (timeSinceLastResponse > 5 && !isAttemptingReconnect) { // 5 seconds timeout
+		//	std::cout << "Connection lost. Attempting to reconnect..." << std::endl;
+		//	isAttemptingReconnect = true;
+		//	AttemptReconnect();
+		//}
+
 		while (socketManager.ReceiveFromHost(data)) {
-
-			
-
 			if (data.empty()) continue;
+
+			lastServerResponseTime = std::chrono::steady_clock::now();
 
 			switch (static_cast<CMDID>(data[0])) {
 			case TICK_SYNC: {
@@ -118,7 +131,10 @@ void NetworkEngine::Update(double) {
 				HandleCommitEvent(data);
 				break;
 			case INITIAL_STATE_OBJECT: // Host sending initial state for an object
-				//HandleInitialStateObject(data);
+				// HandleInitialStateObject(data);
+				break;
+			case FULL_STATE_SNAPSHOT:
+				HandleFullStateSnapshot(data);
 				break;
 			default:
 				// Optional: Log unknown packet type
@@ -139,9 +155,9 @@ bool NetworkEngine::Host(std::string portNumber) {
 	return isHosting;
 }
 
-bool NetworkEngine::Connect(std::string host, std::string portNumber) {
+bool NetworkEngine::Connect(std::string host, std::string portNumber, const std::string& playerName) {
 	isClient = socketManager.ConnectWithHandshake(host, portNumber,
-		CMDID::REQ_CONNECTION, CMDID::RSP_CONNECTION);
+		CMDID::REQ_CONNECTION, CMDID::RSP_CONNECTION, playerName);
 
 	if (isClient) {
 		isHosting = false;
@@ -154,6 +170,30 @@ bool NetworkEngine::Connect(std::string host, std::string portNumber) {
 void NetworkEngine::Exit() {	
 	socketManager.Cleanup();
 	WSACleanup();
+}
+
+void NetworkEngine::AttemptReconnect() {
+	std::thread([this]() {
+		while (isAttemptingReconnect) {
+			if (socketManager.ConnectWithHandshake(socketManager.serverInfo.ipAddress, std::to_string(socketManager.serverInfo.port),
+				CMDID::REQ_RECONNECT, CMDID::RSP_RECONNECT, "hello")) {
+				std::cout << "Reconnected successfully!" << std::endl;
+				isAttemptingReconnect = false;
+
+				// Send reconnect confirmation
+				//std::vector<char> packet;
+				//packet.push_back(CMDID::RECONNECT_INFO);
+				//NetworkID netID = htonl(clientNetworkID);
+				//packet.insert(packet.end(),
+				//	reinterpret_cast<char*>(&netID),
+				//	reinterpret_cast<char*>(&netID) + sizeof(netID));
+				//socketManager.SendToHost(packet);
+				return;
+			}
+
+			std::this_thread::sleep_for(std::chrono::seconds(3)); // Retry every 3 seconds
+		}
+		}).detach();
 }
 
 // Client function to send an event to the server for lockstep processing
@@ -264,22 +304,48 @@ void NetworkEngine::SendToOtherClients(const sockaddr_in& reqClient, std::vector
 		if (client.address.sin_addr.s_addr == reqClient.sin_addr.s_addr &&
 			client.address.sin_port == reqClient.sin_port) continue;
 
-		socketManager.SendToClient(client.address, packet);
+		socketManager.SendToClient(client.address, packet);	
 	}
 }
 
 // Host side handling
 void NetworkEngine::HandleIncomingConnection(const std::vector<char>& data, const sockaddr_in& clientAddr)
 {
-	if (data.empty() || data[0] != REQ_CONNECTION) return;
+	if (data.empty() || (data[0] != REQ_CONNECTION && data[0] != REQ_RECONNECT)) return;
 
-	if (!clientManager.IsKnownClient(clientAddr)) {
+	if (data[0] == CMDID::REQ_RECONNECT) {
+		// Find existing client
+		auto clientOpt = clientManager.GetClientByAddr(clientAddr);
+		if (clientOpt.has_value()) {
+			auto& client = clientOpt.value().get();
+			//client.address = clientAddr; // Update address
+			client.isConnected = true;
+			socketManager.SendToClient(clientAddr, static_cast<char>(CMDID::RSP_RECONNECT));
+
+			// Resend game state
+			//SendFullStateUpdate(client);
+			SendFullStateSnapshot(clientAddr);
+		}
+	} else if (!clientManager.IsKnownClient(clientAddr)) {
+		uint8_t nameLen = 0;
+		if (data.size() > 1) {
+			nameLen = static_cast<uint8_t>(data[1]);
+		}
+		// ensure we have enough bytes:
+		if (data.size() < 2 + nameLen) {
+			std::cerr << "[Host] Invalid REQ_CONNECTION: Not enough data for name.\n";
+			return;
+		}
+		std::string playerName(data.begin() + 2, data.begin() + 2 + nameLen);
+
 		clientManager.AddClient(clientAddr);
 		//EventQueue::GetInstance().Push(std::make_unique<ClientJoinedEvent>());
 
 		auto newClientOpt = clientManager.GetClientByAddr(clientAddr);
 		if (newClientOpt) {
 			socketManager.SendToClient(clientAddr, static_cast<char>(RSP_CONNECTION)); // Send ACK first
+			auto& clientRef = newClientOpt.value().get();
+			playerNames[clientRef.clientID] = playerName;
 			//SendInitialState(newClientOpt.value().get()); // Then send current state
 
 		}
@@ -557,6 +623,83 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 			}
 		}
 		break;
+
+
+		//int offset = 2;  // skip [CMDID] and [EventType], which are the first 2 bytes
+
+		//for (uint8_t i = 0; i < eventData[1]; ++i) {
+		//	uint8_t eventType = eventData[offset++];
+
+		//	// 1) Parse the network ID
+		//	NetworkID networkID;
+		//	std::memcpy(&networkID, &eventData[offset], sizeof(networkID));
+		//	networkID = ntohl(networkID);
+		//	offset += sizeof(networkID);
+
+		//	switch (eventType) {
+		//	case static_cast<uint8_t>(EventType::SpawnPlayer):
+		//		// Next we parse the name length + name
+		//		// (same structure if you also appended name for SpawnPlayer)
+		//	{
+		//		uint8_t nameLen = eventData[offset++];
+		//		std::string playerName(
+		//			eventData.begin() + offset,
+		//			eventData.begin() + offset + nameLen
+		//		);
+		//		offset += nameLen;
+
+		//		// Now you have the player's name. Store it or log it.
+		//		NetworkEngine::GetInstance().playerNames[networkID] = playerName;
+
+		//		// Push the normal SpawnPlayerEvent
+		//		EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
+
+		//		// Optional: Print for debugging
+		//		std::cout << "[StartGame] SpawnPlayer with ID=" << networkID
+		//			<< ", name=" << playerName << std::endl;
+		//	}
+		//	break;
+
+		//	case static_cast<uint8_t>(EventType::PlayerJoined):
+		//	{
+		//		// parse nameLen
+		//		uint8_t nameLen = eventData[offset++];
+		//		// read that many chars from eventData
+		//		std::string playerName(
+		//			eventData.begin() + offset,
+		//			eventData.begin() + offset + nameLen
+		//		);
+		//		offset += nameLen;
+
+		//		// store or log it
+		//		NetworkEngine::GetInstance().playerNames[networkID] = playerName;
+
+		//		EventQueue::GetInstance().Push(std::make_unique<PlayerJoinedEvent>(networkID));
+		//		std::cout << "[StartGame] PlayerJoined with ID=" << networkID
+		//			<< ", name=" << playerName << std::endl;
+		//	}
+		//	break;
+		//	}
+		//}
+		//break;
+
+		//int offset = 2;
+		//while (offset < eventData.size()) {
+		//	uint8_t eventType = eventData[offset++];
+		//	NetworkID netID = /* parse networkID */;
+		//	uint8_t nameLen = eventData[offset++];
+		//	std::string name(eventData.data() + offset, eventData.data() + offset + nameLen);
+		//	offset += nameLen;
+
+		//	// Store locally
+		//	playerNames[netID] = name;
+
+		//	// Handle spawn event
+		//	if (eventType == static_cast<uint8_t>(EventType::PlayerJoined)) {
+		//		EventQueue::Push(std::make_unique<PlayerJoinedEvent>(netID));
+		//	}
+		//}
+		//break;
 	}
 	case EventType::SpawnAsteroid: {
 
@@ -594,6 +737,48 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 
 void NetworkEngine::ProcessTickSync(Tick& receivedHostTick, Tick& localTick) {
 
+}
+
+void NetworkEngine::SendFullStateSnapshot(const sockaddr_in& clientAddr) {
+	std::vector<char> packet;
+	packet.push_back(CMDID::FULL_STATE_SNAPSHOT);
+
+	uint32_t activeCount = std::count_if(g_AsteroidScene->gameObjects.begin(), g_AsteroidScene->gameObjects.end(), [](const std::unique_ptr<GameObject>& obj) {
+		return obj->isActive;
+	});
+
+	//NetworkUtils::WriteToPacket(packet, activeCount, NetworkUtils::DT_LONG);
+
+	//for (auto& go : g_AsteroidScene->gameObjects) {
+	//	if (go->isActive) {
+	//		if (go->type == GameObject::GO_BULLET) continue;
+	//		packet.push_back(go->type);
+	//		auto temp = dynamic_cast<NetworkObject*>(go.get())->Serialize();
+	//		packet.insert(packet.end(), temp.begin(), temp.end());
+	//	}
+	//}
+
+	//socketManager.SendToClient(clientAddr, packet);
+}
+
+void NetworkEngine::HandleFullStateSnapshot(const std::vector<char>& data) {
+	size_t offset = 1;
+	uint32_t totalObjects;
+	NetworkUtils::ReadFromPacket(data.data(), offset, totalObjects, NetworkUtils::DT_LONG);
+	offset += sizeof(totalObjects);
+
+	for (uint32_t i = 0; i < totalObjects; i++) {
+		char objType = data[offset++];
+
+		uint32_t netID;
+		NetworkUtils::ReadFromPacket(data.data(), offset, netID, NetworkUtils::DT_LONG);
+		offset += sizeof(netID);
+
+		switch (objType) {
+
+
+		}
+	}
 }
 
 size_t NetworkEngine::GetNumConnectedClients() const

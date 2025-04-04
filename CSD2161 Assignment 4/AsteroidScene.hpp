@@ -25,8 +25,8 @@ public:
 	const std::unordered_map<NetworkID, int>& GetAllScores() const;
 	std::unordered_map<NetworkID, int>& GetPlayerScores();
 
-private:
 	std::vector<std::unique_ptr<GameObject>> gameObjects;
+private:
 	std::unordered_map<NetworkID, NetworkObject*> networkedObjects;
 	std::unordered_map<NetworkID, int> playerScores;
 };

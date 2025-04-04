@@ -7,8 +7,15 @@
 
 class GameObject {
 public:
-	uint32_t id;
-	bool isActive;
+	enum GO_TYPE {
+		GO_PLAYER,
+		GO_BULLET,
+		GO_ASTEROID
+	};
+
+	//uint32_t id;
+	bool isActive = true;
+	GO_TYPE type;
 	glm::vec4 color = glm::vec4(1.0f);
 	glm::vec3 position{ 0.f, 0.f, 0.f };
 	glm::vec3 scale{ 1.f, 1.f, 1.f };

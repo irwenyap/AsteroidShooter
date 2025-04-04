@@ -18,7 +18,7 @@ bool gameStarted = false;
 std::unordered_map<NetworkID, int> playerScores;
 
 AsteroidScene* g_AsteroidScene = nullptr;
-
+extern std::string g_PlayerName;
 
 void AsteroidScene::Initialize() {
 	GraphicsEngine::GetInstance().Init();
@@ -32,7 +32,19 @@ void AsteroidScene::Update(double dt) {
 
 
 	for (auto& go : gameObjects) {
-		go->Update(dt);
+		if (go->isActive) {
+			go->Update(dt);
+
+			//if (go->type != GameObject::GO_PLAYER) {
+			//	if (go->position.x > 1920.f || go->position.x < -1920.f || go->position.y > 1080.f || go->position.y < 1080.f)
+			//		go->isActive = false;
+			//} else {
+			//	if (go->position.x > 960.f)
+			//		go->position.x = -950.f;
+			//	else if (go->position.x < -960.f)
+			//		go->position.x = 950.f;
+			//}
+		}
 	}
 	if (gameStarted && NetworkEngine::GetInstance().isHosting) {
 		asteroidSpawnTimer += dt;
@@ -56,6 +68,7 @@ void AsteroidScene::Update(double dt) {
 			asteroid->scale = glm::vec3(randomScale, randomScale, 1.f);
 			asteroid->velocity = glm::vec3(velocityX(gen), velocityY(gen), 0.f);
 			asteroid->rotation = 0.f;
+			asteroid->type = GameObject::GO_ASTEROID;
 			asteroid->meshType = Mesh::MESH_TYPE::QUAD;
 			asteroid->textured = true;
 			asteroid->textureType = Texture::TEXTURE_TYPE::TEX_ASTEROID;
@@ -116,7 +129,20 @@ void AsteroidScene::Update(double dt) {
 
 void AsteroidScene::FixedUpdate(double fixedDT) {
 	for (auto& go : gameObjects) {
-		go->FixedUpdate(fixedDT);
+		if (go->isActive) {
+			go->FixedUpdate(fixedDT);
+
+			if (go->type != GameObject::GO_PLAYER) {
+				if (go->position.x > 50.f || go->position.x < -50.f)
+					go->isActive = false;
+			} else {
+				std::cout << go->position.y << std::endl;
+				if (go->position.x > 46.f)
+					go->position.x = -45.f;
+				else if (go->position.x < -46.f)
+					go->position.x = 45.f;
+			}
+		}
 	}
 
 	// Setting only host to detect for collision
@@ -203,11 +229,13 @@ void AsteroidScene::ProcessEvents() {
 				localPlayer->position = glm::vec3(0, 0, 0);
 				localPlayer->scale = glm::vec3(1.5f, 1.5f, 1.5f);
 				localPlayer->rotation = 0.f;
+				localPlayer->type = GameObject::GO_PLAYER;
 				localPlayer->meshType = Mesh::MESH_TYPE::QUAD;
 				localPlayer->isLocal = true;
 				localPlayer->color = { 0.2f, 1.f, 0.2f, 1.f };
 				localPlayer->textured = true;
 				localPlayer->textureType = Texture::TEXTURE_TYPE::TEX_PLAYER;
+				//NetworkEngine::GetInstance().playerNames[localPlayer->networkID] = g_PlayerName;
 
 				Player* rawPlayerPtr = localPlayer.get();
 				gameObjects.push_back(std::move(localPlayer));
@@ -216,6 +244,11 @@ void AsteroidScene::ProcessEvents() {
 				NetworkID netNID = htonl(rawPlayerPtr->networkID);
 				packet.insert(packet.end(), reinterpret_cast<char*>(&netNID),
 					reinterpret_cast<char*>(&netNID) + sizeof(netNID));
+
+				//uint8_t nameLen = (uint8_t)std::min<size_t>(g_PlayerName.size(), 255);
+				//packet.push_back(nameLen);
+				//packet.insert(packet.end(), g_PlayerName.begin(), g_PlayerName.begin() + nameLen);
+
 			}
 
 			for (int i = 0; i < NetworkEngine::GetInstance().GetNumConnectedClients(); ++i) {
@@ -224,6 +257,7 @@ void AsteroidScene::ProcessEvents() {
 				remotePlayer->position = glm::vec3(0, 0, 0);
 				remotePlayer->scale = glm::vec3(1.5f, 1.5f, 1.5f);
 				remotePlayer->rotation = 0.f;
+				remotePlayer->type = GameObject::GO_PLAYER;
 				remotePlayer->meshType = Mesh::MESH_TYPE::QUAD;
 				remotePlayer->isLocal = false;
 				remotePlayer->color = { 0.2f, 0.2f, 1.f, 1.f };
@@ -237,6 +271,12 @@ void AsteroidScene::ProcessEvents() {
 				NetworkID netNID = htonl(rawRemote->networkID);
 				packet.insert(packet.end(), reinterpret_cast<char*>(&netNID),
 					reinterpret_cast<char*>(&netNID) + sizeof(netNID));
+
+				//auto newClientOpt = NetworkEngine::GetInstance().clientManager.GetClientByAddr(clientAddr);
+				//auto& remotePlayerName = NetworkEngine::GetInstance().playerNames[rawRemote->networkID];
+				//uint8_t nameLen = (uint8_t)std::min<size_t>(remotePlayerName.size(), 255);
+				//packet.push_back(nameLen);
+				//packet.insert(packet.end(), remotePlayerName.begin(), remotePlayerName.begin() + nameLen);
 			}
 			EventID eid = NetworkEngine::GetInstance().GenerateEventID();
 			int i = 1;
@@ -256,12 +296,15 @@ void AsteroidScene::ProcessEvents() {
 			newPlayer->position = glm::vec3(0, 0, 0);
 			newPlayer->scale = glm::vec3(1.5f, 1.5f, 1.5f);
 			newPlayer->rotation = 0.f;
+			newPlayer->type = GameObject::GO_PLAYER;
 			newPlayer->meshType = Mesh::MESH_TYPE::QUAD;
 			newPlayer->isLocal = true;
 			newPlayer->color = { 0.2f, 1.f, 0.2f, 1.f };
 			newPlayer->textured = true;
 			newPlayer->textureType = Texture::TEXTURE_TYPE::TEX_PLAYER;
+			//std::string playerName = 
 			//std::cout << "Local Player Network ID: " << newPlayer->networkID << std::endl;
+			//NetworkEngine::GetInstance().playerNames[newPlayer->networkID] = playerName;
 
 			Player* rawPlayerPtr = newPlayer.get();
 
@@ -277,6 +320,7 @@ void AsteroidScene::ProcessEvents() {
 			newPlayer->position = glm::vec3(0, 0, 0);
 			newPlayer->scale = glm::vec3(1.5f, 1.5f, 1.5f);
 			newPlayer->rotation = 0.f;
+			newPlayer->type = GameObject::GO_PLAYER;
 			newPlayer->meshType = Mesh::MESH_TYPE::QUAD;
 			newPlayer->isLocal = false;
 			newPlayer->color = { 0.2f, 0.2f, 1.f, 1.f };
@@ -307,6 +351,7 @@ void AsteroidScene::ProcessEvents() {
 			asteroid->scale = spawnEvent->initialScale;
 			asteroid->velocity = spawnEvent->initialVelocity;
 			asteroid->rotation = 0.f;
+			asteroid->type = GameObject::GO_ASTEROID;
 			asteroid->meshType = Mesh::MESH_TYPE::QUAD;
 			asteroid->color = { 1.f, 1.f, 1.f, 1.f };
 			asteroid->textured = true;

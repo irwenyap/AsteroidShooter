@@ -25,8 +25,6 @@ public:
 	static constexpr long long CLIENT_TIMEOUT_MS = 10000; // 10 seconds without heartbeat = disconnect
 	static constexpr long long HEARTBEAT_INTERVAL_MS = 2000; // Client sends heartbeat every 2 seconds
 
-
-
 	enum CMDID {
 		UNKNOWN = (unsigned char)0x0,
 		REQ_CONNECTION = (unsigned char)0x1,
@@ -39,15 +37,20 @@ public:
 		COMMIT_EVENT = (unsigned char)0x8,  // Host -> Client command to process event
 		HEARTBEAT = (unsigned char)0x9, // Client -> Host keep-alive
 		PLAYER_LEFT = (unsigned char)0xA, // Host -> Client notification
-		INITIAL_STATE_OBJECT = (unsigned char)0xB // Host -> New Client state sync
+		INITIAL_STATE_OBJECT = (unsigned char)0xB, // Host -> New Client state sync
+		REQ_RECONNECT = (unsigned char)0xC,
+		RSP_RECONNECT = (unsigned char)0xD,
+		FULL_STATE_SNAPSHOT = (unsigned char)0xE
 	};
 	static NetworkEngine& GetInstance();
 
 	void Initialize();
 	void Update(double);
 	bool Host(std::string);
-	bool Connect(std::string, std::string);
+	bool Connect(std::string, std::string, const std::string&);
 	void Exit();
+
+	void AttemptReconnect();
 
 	void SendEventToServer(std::unique_ptr<GameEvent> event); // Client function
 	void SendToAllClients(std::vector<char> packet);
@@ -58,6 +61,8 @@ public:
 	void HandleClientEvent(const std::vector<char>& data); //tmp hack for server to send to itself
 	void SendTickSync();
 	void ProcessTickSync(Tick&, Tick&);
+	void SendFullStateSnapshot(const sockaddr_in& clientAddr);
+	void HandleFullStateSnapshot(const std::vector<char>& data);
 	//void SendPacket(std::vector<char>);
 	size_t GetNumConnectedClients() const;
 	void ServerBroadcastEvent(std::unique_ptr<GameEvent> event);
@@ -73,6 +78,10 @@ public:
 
 	Tick simulationTick = 0; // global tick tracker
 	Tick localTick = simulationTick; // for client
+
+	bool isAttemptingReconnect = false;
+	std::chrono::steady_clock::time_point lastServerResponseTime{};
+	std::unordered_map<NetworkID, std::string> playerNames;
 private:
 	NetworkEngine() = default;
 	~NetworkEngine() = default;

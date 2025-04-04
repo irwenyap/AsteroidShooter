@@ -12,11 +12,27 @@
 #include "Networking/NetworkEngine.hpp"
 #include "Graphics/GraphicsEngine.hpp"
 #include "Events/EventQueue.hpp"
+#include "HighScoreManager.hpp"
+#include <algorithm>
 
-//std::pair<int, int> windowSize;
+std::string g_PlayerName;
+static std::vector<HighScore> scores;
+void ShowHighScoreUI() {
+	ImGui::SetNextWindowPos(ImVec2(800, 10), ImGuiCond_Always);
+	ImGui::SetNextWindowBgAlpha(0.8f);
 
-//static bool isHost = false;
-//static bool isClient = false;
+	scores = LoadHighScores();
+	std::sort(scores.begin(), scores.end(),
+		[](const HighScore& a, const HighScore& b) { return a.score > b.score; });
+
+	ImGui::Begin("High Scores", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
+	for (const auto& entry : scores) {
+		ImGui::Text("%s: %d", entry.name.c_str(), entry.score);
+	}
+	ImGui::End();
+}
+
+
 void ShowNetworkUI() {
 	//static char ipAddress[64] = "127.0.0.1";
 	//static char ipAddress[64] = "192.168.0.4";
@@ -30,10 +46,23 @@ void ShowNetworkUI() {
 
 	ImGui::Begin("Network", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
+	if (ne.isAttemptingReconnect) {
+		ImGui::Text("Reconnecting to server...");
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel")) {
+			//ne.CancelReconnect();
+		}
+		return;
+	}
+
+	static char playerName[64] = "Player1";
 	if (!ne.isHosting && !ne.isClient) {
+		ImGui::InputText("Name", playerName, IM_ARRAYSIZE(playerName));
+		ImGui::Separator();
 		ImGui::InputText("Port", port, IM_ARRAYSIZE(port));
 		ImGui::SameLine();
 		if (ImGui::Button("Host")) {
+			g_PlayerName = playerName;
 			ne.isHosting = NetworkEngine::GetInstance().Host(port);
 			ipAddressString = NetworkEngine::GetInstance().GetIPAddress();
 			//if (ne.isHosting) EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(NetworkEngine::GetInstance().GenerateID()));
@@ -48,7 +77,8 @@ void ShowNetworkUI() {
 
 		ImGui::SameLine();
 		if (ImGui::Button("Connect")) {
-			ne.isClient = NetworkEngine::GetInstance().Connect(ipAddress, port);
+			g_PlayerName = playerName;
+			ne.isClient = NetworkEngine::GetInstance().Connect(ipAddress, port, g_PlayerName);
 			ipAddressString = ipAddress;
 			
 			//std::cout << "Connecting to " << ipAddress << ":" << port << std::endl;
@@ -150,6 +180,7 @@ void Application::Run() {
 		ImGui::NewFrame();
 
 		ShowNetworkUI();
+		ShowHighScoreUI();
 
 		as.Update(timer.GetDeltaTime());
 		for (int i = 0; i < timer.GetFixedSteps(); ++i) {
@@ -178,6 +209,12 @@ void Application::Run() {
 
 		m_context->SwapBuffers();
 	}
+	extern AsteroidScene* g_AsteroidScene;
+	std::vector<HighScore> currentHighscores;
+	for (const auto& scores : g_AsteroidScene->GetAllScores()) {
+		currentHighscores.push_back(HighScore{std::to_string(scores.first), scores.second });
+	}
+	SaveHighScores(currentHighscores);
 
 	as.Exit();
 
