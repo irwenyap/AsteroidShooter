@@ -580,30 +580,9 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 		break;
 	}
 	case EventType::StartGame: {
-		//int offset = 2;
-		//for (uint8_t i = 0; i < eventData[1]; ++i) {
-		//	uint8_t eventType = eventData[offset++];
-		//	NetworkID networkID;
-		//	std::memcpy(&networkID, &eventData[offset], sizeof(networkID));
-		//	networkID = ntohl(networkID);
-		//	offset += sizeof(networkID);
-
-		//	switch (eventType) {
-		//	case static_cast<uint8_t>(EventType::SpawnPlayer):
-		//		EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
-		//		break;
-		//	case static_cast<uint8_t>(EventType::PlayerJoined):
-		//		EventQueue::GetInstance().Push(std::make_unique<PlayerJoinedEvent>(networkID));
-		//		break;
-		//	}
-		//}
-		//break;
-		int offset = 2;  // skip [CMDID] and [EventType], which are the first 2 bytes
-
+		int offset = 2;
 		for (uint8_t i = 0; i < eventData[1]; ++i) {
 			uint8_t eventType = eventData[offset++];
-
-			// 1) Parse the network ID
 			NetworkID networkID;
 			std::memcpy(&networkID, &eventData[offset], sizeof(networkID));
 			networkID = ntohl(networkID);
@@ -611,50 +590,91 @@ void NetworkEngine::HandleCommitEvent(const std::vector<char>& data) {
 
 			switch (eventType) {
 			case static_cast<uint8_t>(EventType::SpawnPlayer):
-				// Next we parse the name length + name
-				// (same structure if you also appended name for SpawnPlayer)
-			{
-				uint8_t nameLen = eventData[offset++];
-				std::string playerName(
-					eventData.begin() + offset,
-					eventData.begin() + offset + nameLen
-				);
-				offset += nameLen;
-
-				// Now you have the player's name. Store it or log it.
-				NetworkEngine::GetInstance().playerNames[networkID] = playerName;
-
-				// Push the normal SpawnPlayerEvent
 				EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
-
-				// Optional: Print for debugging
-				std::cout << "[StartGame] SpawnPlayer with ID=" << networkID
-					<< ", name=" << playerName << std::endl;
-			}
-			break;
-
+				break;
 			case static_cast<uint8_t>(EventType::PlayerJoined):
-			{
-				// parse nameLen
-				uint8_t nameLen = eventData[offset++];
-				// read that many chars from eventData
-				std::string playerName(
-					eventData.begin() + offset,
-					eventData.begin() + offset + nameLen
-				);
-				offset += nameLen;
-
-				// store or log it
-				NetworkEngine::GetInstance().playerNames[networkID] = playerName;
-
 				EventQueue::GetInstance().Push(std::make_unique<PlayerJoinedEvent>(networkID));
-				std::cout << "[StartGame] PlayerJoined with ID=" << networkID
-					<< ", name=" << playerName << std::endl;
-			}
-			break;
+				break;
 			}
 		}
 		break;
+
+
+		//int offset = 2;  // skip [CMDID] and [EventType], which are the first 2 bytes
+
+		//for (uint8_t i = 0; i < eventData[1]; ++i) {
+		//	uint8_t eventType = eventData[offset++];
+
+		//	// 1) Parse the network ID
+		//	NetworkID networkID;
+		//	std::memcpy(&networkID, &eventData[offset], sizeof(networkID));
+		//	networkID = ntohl(networkID);
+		//	offset += sizeof(networkID);
+
+		//	switch (eventType) {
+		//	case static_cast<uint8_t>(EventType::SpawnPlayer):
+		//		// Next we parse the name length + name
+		//		// (same structure if you also appended name for SpawnPlayer)
+		//	{
+		//		uint8_t nameLen = eventData[offset++];
+		//		std::string playerName(
+		//			eventData.begin() + offset,
+		//			eventData.begin() + offset + nameLen
+		//		);
+		//		offset += nameLen;
+
+		//		// Now you have the player's name. Store it or log it.
+		//		NetworkEngine::GetInstance().playerNames[networkID] = playerName;
+
+		//		// Push the normal SpawnPlayerEvent
+		//		EventQueue::GetInstance().Push(std::make_unique<SpawnPlayerEvent>(networkID));
+
+		//		// Optional: Print for debugging
+		//		std::cout << "[StartGame] SpawnPlayer with ID=" << networkID
+		//			<< ", name=" << playerName << std::endl;
+		//	}
+		//	break;
+
+		//	case static_cast<uint8_t>(EventType::PlayerJoined):
+		//	{
+		//		// parse nameLen
+		//		uint8_t nameLen = eventData[offset++];
+		//		// read that many chars from eventData
+		//		std::string playerName(
+		//			eventData.begin() + offset,
+		//			eventData.begin() + offset + nameLen
+		//		);
+		//		offset += nameLen;
+
+		//		// store or log it
+		//		NetworkEngine::GetInstance().playerNames[networkID] = playerName;
+
+		//		EventQueue::GetInstance().Push(std::make_unique<PlayerJoinedEvent>(networkID));
+		//		std::cout << "[StartGame] PlayerJoined with ID=" << networkID
+		//			<< ", name=" << playerName << std::endl;
+		//	}
+		//	break;
+		//	}
+		//}
+		//break;
+
+		//int offset = 2;
+		//while (offset < eventData.size()) {
+		//	uint8_t eventType = eventData[offset++];
+		//	NetworkID netID = /* parse networkID */;
+		//	uint8_t nameLen = eventData[offset++];
+		//	std::string name(eventData.data() + offset, eventData.data() + offset + nameLen);
+		//	offset += nameLen;
+
+		//	// Store locally
+		//	playerNames[netID] = name;
+
+		//	// Handle spawn event
+		//	if (eventType == static_cast<uint8_t>(EventType::PlayerJoined)) {
+		//		EventQueue::Push(std::make_unique<PlayerJoinedEvent>(netID));
+		//	}
+		//}
+		//break;
 	}
 	case EventType::SpawnAsteroid: {
 

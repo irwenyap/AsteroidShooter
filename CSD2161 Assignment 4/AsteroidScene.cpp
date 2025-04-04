@@ -245,9 +245,9 @@ void AsteroidScene::ProcessEvents() {
 				packet.insert(packet.end(), reinterpret_cast<char*>(&netNID),
 					reinterpret_cast<char*>(&netNID) + sizeof(netNID));
 
-				uint8_t nameLen = (uint8_t)std::min<size_t>(g_PlayerName.size(), 255);
-				packet.push_back(nameLen);
-				packet.insert(packet.end(), g_PlayerName.begin(), g_PlayerName.begin() + nameLen);
+				//uint8_t nameLen = (uint8_t)std::min<size_t>(g_PlayerName.size(), 255);
+				//packet.push_back(nameLen);
+				//packet.insert(packet.end(), g_PlayerName.begin(), g_PlayerName.begin() + nameLen);
 
 			}
 
@@ -273,10 +273,10 @@ void AsteroidScene::ProcessEvents() {
 					reinterpret_cast<char*>(&netNID) + sizeof(netNID));
 
 				//auto newClientOpt = NetworkEngine::GetInstance().clientManager.GetClientByAddr(clientAddr);
-				auto& remotePlayerName = NetworkEngine::GetInstance().playerNames[rawRemote->networkID];
-				uint8_t nameLen = (uint8_t)std::min<size_t>(remotePlayerName.size(), 255);
-				packet.push_back(nameLen);
-				packet.insert(packet.end(), remotePlayerName.begin(), remotePlayerName.begin() + nameLen);
+				//auto& remotePlayerName = NetworkEngine::GetInstance().playerNames[rawRemote->networkID];
+				//uint8_t nameLen = (uint8_t)std::min<size_t>(remotePlayerName.size(), 255);
+				//packet.push_back(nameLen);
+				//packet.insert(packet.end(), remotePlayerName.begin(), remotePlayerName.begin() + nameLen);
 			}
 
 			int i = 1;
@@ -302,9 +302,9 @@ void AsteroidScene::ProcessEvents() {
 			newPlayer->color = { 0.2f, 1.f, 0.2f, 1.f };
 			newPlayer->textured = true;
 			newPlayer->textureType = Texture::TEXTURE_TYPE::TEX_PLAYER;
-			std::string playerName = 
+			//std::string playerName = 
 			//std::cout << "Local Player Network ID: " << newPlayer->networkID << std::endl;
-			NetworkEngine::GetInstance().playerNames[newPlayer->networkID] = playerName;
+			//NetworkEngine::GetInstance().playerNames[newPlayer->networkID] = playerName;
 
 			Player* rawPlayerPtr = newPlayer.get();
 
